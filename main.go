@@ -29,6 +29,7 @@ type IdtResponse struct {
 
 // VouchHandler handles POST requests to /vouch
 func VouchHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
 	var req VouchRequest
 	
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -44,7 +45,6 @@ func VouchHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	
-	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(VouchResponse{Success: true, Message: "Vouch accepted"})
 }
 
