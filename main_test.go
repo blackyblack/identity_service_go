@@ -17,7 +17,10 @@ func TestVouchHandler_Success(t *testing.T) {
 		To:        "user2",
 	}
 	
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatalf("Failed to marshal request: %v", err)
+	}
 	req := httptest.NewRequest("POST", "/vouch", bytes.NewBuffer(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
@@ -29,7 +32,9 @@ func TestVouchHandler_Success(t *testing.T) {
 	}
 	
 	var resp VouchResponse
-	json.NewDecoder(w.Body).Decode(&resp)
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("Failed to decode response: %v", err)
+	}
 	
 	if !resp.Success {
 		t.Errorf("Expected success to be true, got false")
@@ -48,7 +53,10 @@ func TestVouchHandler_MissingFields(t *testing.T) {
 		// Missing nonce and to
 	}
 	
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatalf("Failed to marshal request: %v", err)
+	}
 	req := httptest.NewRequest("POST", "/vouch", bytes.NewBuffer(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
@@ -60,7 +68,9 @@ func TestVouchHandler_MissingFields(t *testing.T) {
 	}
 	
 	var resp VouchResponse
-	json.NewDecoder(w.Body).Decode(&resp)
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("Failed to decode response: %v", err)
+	}
 	
 	if resp.Success {
 		t.Errorf("Expected success to be false, got true")
@@ -84,7 +94,9 @@ func TestVouchHandler_InvalidJSON(t *testing.T) {
 	}
 	
 	var resp VouchResponse
-	json.NewDecoder(w.Body).Decode(&resp)
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("Failed to decode response: %v", err)
+	}
 	
 	if resp.Success {
 		t.Errorf("Expected success to be false, got true")
@@ -105,7 +117,9 @@ func TestIdtHandler_Success(t *testing.T) {
 	}
 	
 	var resp IdtResponse
-	json.NewDecoder(w.Body).Decode(&resp)
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("Failed to decode response: %v", err)
+	}
 	
 	if resp.User != "testuser" {
 		t.Errorf("Expected user 'testuser', got '%s'", resp.User)
@@ -129,7 +143,9 @@ func TestIdtHandler_MultipleUsers(t *testing.T) {
 		}
 		
 		var resp IdtResponse
-		json.NewDecoder(w.Body).Decode(&resp)
+		if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+			t.Fatalf("Failed to decode response for user %s: %v", user, err)
+		}
 		
 		if resp.User != user {
 			t.Errorf("Expected user '%s', got '%s'", user, resp.User)
@@ -146,7 +162,10 @@ func TestVouchHandler_AllFields(t *testing.T) {
 		To:        "bob@example.com",
 	}
 	
-	body, _ := json.Marshal(reqBody)
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		t.Fatalf("Failed to marshal request: %v", err)
+	}
 	req := httptest.NewRequest("POST", "/vouch", bytes.NewBuffer(body))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
@@ -158,7 +177,9 @@ func TestVouchHandler_AllFields(t *testing.T) {
 	}
 	
 	var resp VouchResponse
-	json.NewDecoder(w.Body).Decode(&resp)
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("Failed to decode response: %v", err)
+	}
 	
 	if !resp.Success {
 		t.Errorf("Expected success to be true")
@@ -180,7 +201,10 @@ func TestSetupRouter(t *testing.T) {
 		Nonce:     "test",
 		To:        "test",
 	}
-	body, _ := json.Marshal(vouchReq)
+	body, err := json.Marshal(vouchReq)
+	if err != nil {
+		t.Fatalf("Failed to marshal request: %v", err)
+	}
 	req := httptest.NewRequest("POST", "/vouch", bytes.NewBuffer(body))
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
