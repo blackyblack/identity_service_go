@@ -8,6 +8,8 @@ import (
 	"testing"
 )
 
+var appState = NewAppState()
+
 // TestVouchHandler_Success tests the vouch endpoint with valid input
 func TestVouchHandler_Success(t *testing.T) {
 	reqBody := VouchRequest{
@@ -25,7 +27,7 @@ func TestVouchHandler_Success(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
-	vouchHandler(w, req)
+	vouchHandler(appState, w, req)
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("Expected status %d, got %d", http.StatusOK, w.Code)
@@ -61,7 +63,7 @@ func TestVouchHandler_MissingFields(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
-	vouchHandler(w, req)
+	vouchHandler(appState, w, req)
 
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("Expected status %d, got %d", http.StatusBadRequest, w.Code)
@@ -87,7 +89,7 @@ func TestVouchHandler_InvalidJSON(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
 
-	vouchHandler(w, req)
+	vouchHandler(appState, w, req)
 
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("Expected status %d, got %d", http.StatusBadRequest, w.Code)

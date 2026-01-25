@@ -42,7 +42,7 @@ func sendErrorResponse(w http.ResponseWriter, statusCode int, message string) {
 }
 
 // vouchHandler handles POST requests to /vouch
-func vouchHandler(w http.ResponseWriter, r *http.Request) {
+func vouchHandler(state *AppState, w http.ResponseWriter, r *http.Request) {
 	var req VouchRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		sendErrorResponse(w, http.StatusBadRequest, "Invalid JSON")
@@ -55,7 +55,7 @@ func vouchHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	res := VouchHandler(req.From, req.Signature, req.Nonce, req.To)
+	res := VouchHandler(state, req.From, req.Signature, req.Nonce, req.To)
 	if res != nil {
 		sendErrorResponse(w, http.StatusBadRequest, res.Error())
 		return
@@ -65,9 +65,9 @@ func vouchHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // idtHandler handles GET requests to /idt/:user
-func idtHandler(w http.ResponseWriter, r *http.Request) {
+func idtHandler(state *AppState, w http.ResponseWriter, r *http.Request) {
 	user := mux.Vars(r)["user"]
-	res, err := IdtHandler(user)
+	res, err := IdtHandler(state, user)
 	if err != nil {
 		sendErrorResponse(w, http.StatusBadRequest, err.Error())
 		return
@@ -78,9 +78,14 @@ func idtHandler(w http.ResponseWriter, r *http.Request) {
 
 // setupRouter creates and configures the HTTP router
 func setupRouter() *mux.Router {
+	appState := NewAppState()
 	router := mux.NewRouter()
 	router.Use(contentTypeApplicationJsonMiddleware)
-	router.HandleFunc("/vouch", vouchHandler).Methods("POST")
-	router.HandleFunc("/idt/{user}", idtHandler).Methods("GET")
+	router.HandleFunc("/vouch", func(w http.ResponseWriter, r *http.Request) {
+		vouchHandler(appState, w, r)
+	}).Methods("POST")
+	router.HandleFunc("/idt/{user}", func(w http.ResponseWriter, r *http.Request) {
+		idtHandler(appState, w, r)
+	}).Methods("GET")
 	return router
 }
