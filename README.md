@@ -2,11 +2,6 @@
 
 Identity service in Go language - HTTP REST API skeleton with basic endpoints.
 
-## Features
-
-- **POST /vouch** - Accept vouch requests with JSON body
-- **GET /idt/:user** - Get user identity information
-
 ## Installation
 
 ```bash
@@ -20,12 +15,6 @@ go run main.go
 ```
 
 The service will start on port 8080.
-
-## Running Tests
-
-```bash
-go test -v
-```
 
 ## API Endpoints
 
@@ -72,10 +61,3 @@ Example response:
   "user": "testuser"
 }
 ```
-
-## Project Structure
-
-- `main.go` - Main application with HTTP handlers
-- `main_test.go` - Unit tests for all endpoints
-- `go.mod` - Go module definition
-
