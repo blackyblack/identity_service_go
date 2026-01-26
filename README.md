@@ -11,7 +11,7 @@ go mod download
 ## Running the Service
 
 ```bash
-go run main.go
+go run src/main.go
 ```
 
 The service will start on port 8080.

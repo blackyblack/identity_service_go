@@ -7,6 +7,6 @@ type IdtInfo struct {
 }
 
 // IdtHandler handles identity requests
-func IdtHandler(state *AppState, _user string) (IdtInfo, IdentityError) {
-	return IdtInfo{}, nil
+func IdtHandler(state *AppState, user string) (IdtInfo, IdentityError) {
+	return IdtInfo{User: user}, nil
 }

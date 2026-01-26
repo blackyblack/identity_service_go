@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 
 	"github.com/gorilla/mux"
@@ -37,8 +38,20 @@ func contentTypeApplicationJsonMiddleware(next http.Handler) http.Handler {
 
 // sendErrorResponse sends a JSON error response with the given status code and message.
 func sendErrorResponse(w http.ResponseWriter, statusCode int, message string) {
+	data, err := json.Marshal(AnyResponse{Success: false, Message: message})
+	if err != nil {
+		log.Printf("Failed to encode error response to JSON: %v", err)
+		sendInternalError(w)
+		return
+	}
 	w.WriteHeader(statusCode)
-	json.NewEncoder(w).Encode(AnyResponse{Success: false, Message: message})
+	w.Write(data)
+}
+
+// sendInternalError sends a generic internal server error response.
+func sendInternalError(w http.ResponseWriter) {
+	w.Header().Set("Content-Type", "text/plain")
+	http.Error(w, "Failed to encode error response", http.StatusInternalServerError)
 }
 
 // vouchHandler handles POST requests to /vouch
@@ -61,7 +74,13 @@ func vouchHandler(state *AppState, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	json.NewEncoder(w).Encode(AnyResponse{Success: true, Message: "Vouch accepted"})
+	data, err := json.Marshal(AnyResponse{Success: true, Message: "Vouch accepted"})
+	if err != nil {
+		log.Printf("Failed to encode vouch response to JSON: %v", err)
+		sendInternalError(w)
+		return
+	}
+	w.Write(data)
 }
 
 // idtHandler handles GET requests to /idt/:user
@@ -73,7 +92,13 @@ func idtHandler(state *AppState, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	response := IdtResponse{User: res.User}
-	json.NewEncoder(w).Encode(response)
+	data, err := json.Marshal(response)
+	if err != nil {
+		log.Printf("Failed to encode idt response to JSON: %v", err)
+		sendInternalError(w)
+		return
+	}
+	w.Write(data)
 }
 
 // setupRouter creates and configures the HTTP router

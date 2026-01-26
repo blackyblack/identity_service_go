@@ -8,10 +8,9 @@ import (
 	"testing"
 )
 
-var appState = NewAppState()
-
 // TestVouchHandler_Success tests the vouch endpoint with valid input
 func TestVouchHandler_Success(t *testing.T) {
+	appState := NewAppState()
 	reqBody := VouchRequest{
 		From:      "user1",
 		Signature: "sig123",
@@ -49,6 +48,7 @@ func TestVouchHandler_Success(t *testing.T) {
 
 // TestVouchHandler_MissingFields tests the vouch endpoint with missing fields
 func TestVouchHandler_MissingFields(t *testing.T) {
+	appState := NewAppState()
 	reqBody := VouchRequest{
 		From:      "user1",
 		Signature: "sig123",
@@ -85,6 +85,7 @@ func TestVouchHandler_MissingFields(t *testing.T) {
 
 // TestVouchHandler_InvalidJSON tests the vouch endpoint with invalid JSON
 func TestVouchHandler_InvalidJSON(t *testing.T) {
+	appState := NewAppState()
 	req := httptest.NewRequest("POST", "/vouch", bytes.NewBufferString("invalid json"))
 	req.Header.Set("Content-Type", "application/json")
 	w := httptest.NewRecorder()
