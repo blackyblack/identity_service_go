@@ -18,6 +18,24 @@ type VouchRequest struct {
 	To        string `json:"to"`
 }
 
+// ProofRequest represents the request body for the prove endpoint
+type ProofRequest struct {
+	User    string `json:"user"`
+	Balance int    `json:"balance"`
+
+	// TODO: add proof field
+	// TODO: add moderator's credentials
+}
+
+// PunishRequest represents the request body for the punish endpoint
+type PunishRequest struct {
+	User   string `json:"user"`
+	Amount int    `json:"amount"`
+
+	// TODO: add punish reason field
+	// TODO: add moderator's credentials
+}
+
 // AnyResponse represents the common response
 type AnyResponse struct {
 	Success bool   `json:"success"`
@@ -26,7 +44,8 @@ type AnyResponse struct {
 
 // IdtResponse represents the response for the idt endpoint
 type IdtResponse struct {
-	User string `json:"user"`
+	User    string `json:"user"`
+	Balance int    `json:"balance"`
 }
 
 func contentTypeApplicationJsonMiddleware(next http.Handler) http.Handler {
@@ -83,6 +102,62 @@ func vouchHandler(state *AppState, w http.ResponseWriter, r *http.Request) {
 	w.Write(data)
 }
 
+// proveHandler handles POST requests to /prove
+func proveHandler(state *AppState, w http.ResponseWriter, r *http.Request) {
+	var req ProofRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		sendErrorResponse(w, http.StatusBadRequest, "Invalid JSON")
+		return
+	}
+
+	if req.User == "" {
+		sendErrorResponse(w, http.StatusBadRequest, "Missing required fields")
+		return
+	}
+
+	res := ProveHandler(state, req.User, req.Balance)
+	if res != nil {
+		sendErrorResponse(w, http.StatusBadRequest, res.Error())
+		return
+	}
+
+	data, err := json.Marshal(AnyResponse{Success: true, Message: "Proof accepted"})
+	if err != nil {
+		log.Printf("Failed to encode proof response to JSON: %v", err)
+		sendInternalError(w)
+		return
+	}
+	w.Write(data)
+}
+
+// punishHandler handles POST requests to /punish
+func punishHandler(state *AppState, w http.ResponseWriter, r *http.Request) {
+	var req PunishRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		sendErrorResponse(w, http.StatusBadRequest, "Invalid JSON")
+		return
+	}
+
+	if req.User == "" || req.Amount <= 0 {
+		sendErrorResponse(w, http.StatusBadRequest, "Missing required fields")
+		return
+	}
+
+	res := PunishHandler(state, req.User, req.Amount)
+	if res != nil {
+		sendErrorResponse(w, http.StatusBadRequest, res.Error())
+		return
+	}
+
+	data, err := json.Marshal(AnyResponse{Success: true, Message: "Punish accepted"})
+	if err != nil {
+		log.Printf("Failed to encode punish response to JSON: %v", err)
+		sendInternalError(w)
+		return
+	}
+	w.Write(data)
+}
+
 // idtHandler handles GET requests to /idt/:user
 func idtHandler(state *AppState, w http.ResponseWriter, r *http.Request) {
 	user := mux.Vars(r)["user"]
@@ -91,7 +166,7 @@ func idtHandler(state *AppState, w http.ResponseWriter, r *http.Request) {
 		sendErrorResponse(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	response := IdtResponse{User: res.User}
+	response := IdtResponse{User: res.User, Balance: res.Balance}
 	data, err := json.Marshal(response)
 	if err != nil {
 		log.Printf("Failed to encode idt response to JSON: %v", err)
@@ -108,6 +183,12 @@ func setupRouter() *mux.Router {
 	router.Use(contentTypeApplicationJsonMiddleware)
 	router.HandleFunc("/vouch", func(w http.ResponseWriter, r *http.Request) {
 		vouchHandler(appState, w, r)
+	}).Methods("POST")
+	router.HandleFunc("/prove", func(w http.ResponseWriter, r *http.Request) {
+		proveHandler(appState, w, r)
+	}).Methods("POST")
+	router.HandleFunc("/punish", func(w http.ResponseWriter, r *http.Request) {
+		punishHandler(appState, w, r)
 	}).Methods("POST")
 	router.HandleFunc("/idt/{user}", func(w http.ResponseWriter, r *http.Request) {
 		idtHandler(appState, w, r)
