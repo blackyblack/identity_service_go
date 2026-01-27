@@ -8,7 +8,7 @@ import "maps"
 // IDT token is estimated to have 6 decimal digits of precision, and each user should have no
 // more than 100 IDT, so 8th level gives smallest contributable weight of 0.000001 IDT.
 // NOTE: penalties are not limited with 100 IDT, so one may consider another depth for penalty calculations.
-const DEFAULT_TREE_DEPTH = 8
+const DefaultTreeDepth = 8
 
 // VouchGraphEdge represents a vouch event between two users.
 type VouchGraphEdge struct {
@@ -124,6 +124,9 @@ func (g VouchGraph) buildTree(user string, depth int, isOutgoing bool) *VouchTre
 
 		graphNode, exists := g.Nodes[curr.node.User]
 		if !exists {
+			continue
+		}
+		if graphNode == nil {
 			continue
 		}
 
