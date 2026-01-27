@@ -110,7 +110,7 @@ func proveHandler(state *AppState, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.User == "" {
+	if req.User == "" || req.Balance < 0 {
 		sendErrorResponse(w, http.StatusBadRequest, "Missing required fields")
 		return
 	}
