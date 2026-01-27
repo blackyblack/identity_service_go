@@ -8,5 +8,6 @@ type IdtInfo struct {
 
 // IdtHandler handles identity requests
 func IdtHandler(state *AppState, user string) (IdtInfo, IdentityError) {
-	return IdtInfo{User: user}, nil
+	balance := state.ModerationBalance(user)
+	return IdtInfo{User: user, Balance: balance}, nil
 }
