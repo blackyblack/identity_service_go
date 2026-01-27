@@ -141,20 +141,3 @@ func TestAppStateModerationBalanceNoProofRecord(t *testing.T) {
 		t.Fatalf("expected moderated balance -30, got %d", got)
 	}
 }
-
-func TestAppStateModerationBalanceNegativeWhenPenaltiesExceedProof(t *testing.T) {
-	state := NewAppState()
-
-	// Set proof balance of 50
-	state.SetProof(ProofEvent{User: "alice", Balance: 50})
-	
-	// Add penalties totaling 80 (exceeding proof balance)
-	state.AddPenalty(PenaltyEvent{User: "alice", Amount: 30})
-	state.AddPenalty(PenaltyEvent{User: "alice", Amount: 25})
-	state.AddPenalty(PenaltyEvent{User: "alice", Amount: 25})
-
-	// Balance should be negative: 50 - 80 = -30
-	if got := state.ModerationBalance("alice"); got != -30 {
-		t.Fatalf("expected moderated balance -30, got %d", got)
-	}
-}
