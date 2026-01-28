@@ -9,6 +9,8 @@ type AppState struct {
 	proofs  map[string]ProofEvent
 	// Penalties per user
 	penalties map[string][]PenaltyEvent
+
+	// TODO: maybe keep vouch graph cached here?
 }
 
 // NewAppState initializes an empty application state.
@@ -63,7 +65,7 @@ func (s *AppState) AddPenalty(penalty PenaltyEvent) {
 	s.penalties[penalty.User] = append(s.penalties[penalty.User], penalty)
 }
 
-// Penalties returns a copy of all stored penalties.
+// Penalties returns a copy of all stored penalties per user.
 func (s *AppState) Penalties(user string) []PenaltyEvent {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
