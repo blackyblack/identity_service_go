@@ -1,14 +1,15 @@
 package main
 
 const penaltyWeightPerLayer = 0.1
+const balanceWeightPerLayer = 0.1
 
-type processFunc func(node *VouchTreeNode, results map[*VouchTreeNode]uint64) uint64
+type processFunc[T any] func(node *VouchTreeNode, results map[*VouchTreeNode]T) T
 
 // walkTreePostOrder traverses the vouch tree in post-order and applies the process function to each node.
 // It returns a map of nodes to their computed values.
 // Process function returns a single value for each node, i.e. balance.
-func walkTreePostOrder(root *VouchTreeNode, process processFunc) map[*VouchTreeNode]uint64 {
-	results := make(map[*VouchTreeNode]uint64)
+func walkTreePostOrder[T any](root *VouchTreeNode, process processFunc[T]) map[*VouchTreeNode]T {
+	results := make(map[*VouchTreeNode]T)
 	if root == nil {
 		return results
 	}
@@ -81,6 +82,47 @@ func penalty(state *AppState, user string, tree *VouchTreeNode) uint64 {
 				continue
 			}
 			total += uint64(penaltyWeightPerLayer * float64(results[edge.Peer]))
+		}
+		return total
+	})
+
+	return results[tree]
+}
+
+// balance computes the aggregated balance for a user.
+// If an incoming tree is not provided, it is built from the vouch graph.
+func balance(state *AppState, user string, tree *VouchTreeNode) int64 {
+	if tree == nil {
+		// Builds a vouch graph and incoming user's tree of default depth.
+		graph := state.VouchGraph()
+		tree = graph.IncomingTree(user, DefaultTreeDepth)
+	}
+
+	// NOTE: Do not check for nil state or tree, allow panic in that case.
+
+	// TODO: apply balance decay based on timestamp
+
+	balances := make(map[string]int64)
+	baseBalance := func(u string) int64 {
+		if sum, ok := balances[u]; ok {
+			return sum
+		}
+		sum := int64(0)
+		if proof, ok := state.ProofRecord(u); ok {
+			sum = int64(proof.Balance)
+		}
+		sum -= int64(penalty(state, u, nil))
+		balances[u] = sum
+		return sum
+	}
+
+	results := walkTreePostOrder(tree, func(node *VouchTreeNode, results map[*VouchTreeNode]int64) int64 {
+		total := baseBalance(node.User)
+		for _, edge := range node.Peers {
+			if edge.Peer == nil {
+				continue
+			}
+			total += int64(balanceWeightPerLayer * float64(results[edge.Peer]))
 		}
 		return total
 	})
