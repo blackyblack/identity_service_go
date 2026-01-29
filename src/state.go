@@ -9,6 +9,8 @@ type AppState struct {
 	proofs  map[string]ProofEvent
 	// Penalties per user
 	penalties map[string][]PenaltyEvent
+
+	// TODO: maybe keep vouch graph cached here?
 }
 
 // NewAppState initializes an empty application state.
@@ -63,7 +65,7 @@ func (s *AppState) AddPenalty(penalty PenaltyEvent) {
 	s.penalties[penalty.User] = append(s.penalties[penalty.User], penalty)
 }
 
-// Penalties returns a copy of all stored penalties.
+// Penalties returns a copy of all stored penalties per user.
 func (s *AppState) Penalties(user string) []PenaltyEvent {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -74,19 +76,19 @@ func (s *AppState) Penalties(user string) []PenaltyEvent {
 
 // ModerationBalance computes a user's balance as the proof balance minus penalties.
 // If no proof record exists, the base balance is 0.
-func (s *AppState) ModerationBalance(user string) int {
+func (s *AppState) ModerationBalance(user string) int64 {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	base := 0
+	base := int64(0)
 	if proof, ok := s.proofs[user]; ok {
-		base = proof.Balance
+		base = int64(proof.Balance)
 	}
 
-	penaltySum := 0
+	penaltySum := int64(0)
 	// TODO: add penalty decay based on timestamp
 	for _, penalty := range s.penalties[user] {
-		penaltySum += penalty.Amount
+		penaltySum += int64(penalty.Amount)
 	}
 
 	return base - penaltySum

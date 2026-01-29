@@ -1,0 +1,104 @@
+package main
+
+import "testing"
+
+func TestPenaltyBuildsOutgoingTree(t *testing.T) {
+	state := NewAppState()
+
+	v1 := VouchEvent{From: "alice", To: "bob"}
+	v2 := VouchEvent{From: "bob", To: "carol"}
+
+	state.AddVouch(v1)
+	state.AddVouch(v2)
+
+	state.AddPenalty(PenaltyEvent{User: "alice", Amount: 5})
+	state.AddPenalty(PenaltyEvent{User: "bob", Amount: 100})
+	state.AddPenalty(PenaltyEvent{User: "carol", Amount: 1000})
+
+	got := penalty(state, "alice", nil)
+	if got != 25 {
+		t.Fatalf("expected penalty 25, got %d", got)
+	}
+}
+
+func TestPenaltyUsesProvidedTree(t *testing.T) {
+	state := NewAppState()
+
+	v1 := VouchEvent{From: "alice", To: "bob"}
+	v2 := VouchEvent{From: "bob", To: "carol"}
+
+	state.AddVouch(v1)
+	state.AddVouch(v2)
+
+	state.AddPenalty(PenaltyEvent{User: "alice", Amount: 5})
+	state.AddPenalty(PenaltyEvent{User: "bob", Amount: 100})
+	state.AddPenalty(PenaltyEvent{User: "carol", Amount: 1000})
+
+	graph := BuildVouchGraph([]VouchEvent{v1, v2})
+	tree := graph.OutgoingTree("alice", 1)
+
+	got := penalty(state, "alice", tree)
+	if got != 15 {
+		t.Fatalf("expected penalty 15, got %d", got)
+	}
+
+	// Without provided tree, full depth is used
+	got = penalty(state, "alice", nil)
+	if got != 25 {
+		t.Fatalf("expected penalty 25, got %d", got)
+	}
+}
+
+func TestPenaltySumsUserPenalties(t *testing.T) {
+	state := NewAppState()
+	state.AddPenalty(PenaltyEvent{User: "alice", Amount: 10})
+	state.AddPenalty(PenaltyEvent{User: "alice", Amount: 7})
+
+	got := penalty(state, "alice", nil)
+	if got != 17 {
+		t.Fatalf("expected penalty 17, got %d", got)
+	}
+}
+
+func TestPenaltyUserNotInGraphUsesDirectPenalties(t *testing.T) {
+	state := NewAppState()
+	state.AddVouch(VouchEvent{From: "alice", To: "bob"})
+	state.AddPenalty(PenaltyEvent{User: "mallory", Amount: 12})
+	state.AddPenalty(PenaltyEvent{User: "alice", Amount: 50})
+
+	graph := state.VouchGraph()
+	if _, ok := graph.Nodes["mallory"]; ok {
+		t.Fatal("expected mallory to be absent from vouch graph")
+	}
+	tree := graph.OutgoingTree("mallory", DefaultTreeDepth)
+	if got := len(tree.Peers); got != 0 {
+		t.Fatalf("expected no outgoing peers for mallory, got %d", got)
+	}
+
+	got := penalty(state, "mallory", nil)
+	if got != 12 {
+		t.Fatalf("expected penalty 12, got %d", got)
+	}
+}
+
+func TestPenaltyEmptyStateNoPenalties(t *testing.T) {
+	state := NewAppState()
+
+	got := penalty(state, "alice", nil)
+	if got != 0 {
+		t.Fatalf("expected penalty 0, got %d", got)
+	}
+}
+
+func TestPenaltyInheritsFromVouchedUsers(t *testing.T) {
+	state := NewAppState()
+	state.AddVouch(VouchEvent{From: "alice", To: "bob"})
+	state.AddVouch(VouchEvent{From: "alice", To: "carol"})
+	state.AddPenalty(PenaltyEvent{User: "bob", Amount: 50})
+	state.AddPenalty(PenaltyEvent{User: "carol", Amount: 70})
+
+	got := penalty(state, "alice", nil)
+	if got != 12 {
+		t.Fatalf("expected penalty 12, got %d", got)
+	}
+}
