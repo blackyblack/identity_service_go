@@ -1,5 +1,7 @@
 package main
 
+import "log"
+
 const penaltyWeightPerLayer = 0.1
 const balanceWeightPerLayer = 0.1
 
@@ -7,7 +9,7 @@ type processFunc[T any] func(node *VouchTreeNode, results map[*VouchTreeNode]T) 
 
 // walkTreePostOrder traverses the vouch tree in post-order and applies the process function to each node.
 // It returns a map of nodes to their computed values.
-// Process function returns a single value for each node, i.e. balance.
+// The process function returns a single aggregated value of type T for each node.
 func walkTreePostOrder[T any](root *VouchTreeNode, process processFunc[T]) map[*VouchTreeNode]T {
 	results := make(map[*VouchTreeNode]T)
 	if root == nil {
@@ -51,6 +53,11 @@ func walkTreePostOrder[T any](root *VouchTreeNode, process processFunc[T]) map[*
 // penalty computes the aggregated penalty for a user.
 // If an outgoing tree is not provided, it is built from the vouch graph.
 func penalty(state *AppState, user string, tree *VouchTreeNode) uint64 {
+	// user should be the root of the tree
+	if tree != nil && tree.User != user {
+		log.Fatalf("Warning: provided tree root user %v does not match target user %v", tree.User, user)
+	}
+
 	if tree == nil {
 		// Builds a vouch graph and outgoing user's tree of default depth.
 		graph := state.VouchGraph()
@@ -90,12 +97,18 @@ func penalty(state *AppState, user string, tree *VouchTreeNode) uint64 {
 }
 
 // balance computes the aggregated balance for a user.
-// If an incoming tree is not provided, it is built from the vouch graph.
-func balance(state *AppState, user string, tree *VouchTreeNode) int64 {
-	if tree == nil {
+// If incoming tree is not provided, it is built from the vouch graph.
+func balance(state *AppState, user string, incomingTree *VouchTreeNode) int64 {
+	// user should be the root of the tree
+	if incomingTree != nil && incomingTree.User != user {
+		log.Fatalf("Warning: provided tree root user %v does not match target user %v", incomingTree.User, user)
+	}
+
+	var graph VouchGraph
+	if incomingTree == nil {
+		graph = state.VouchGraph()
 		// Builds a vouch graph and incoming user's tree of default depth.
-		graph := state.VouchGraph()
-		tree = graph.IncomingTree(user, DefaultTreeDepth)
+		incomingTree = graph.IncomingTree(user, DefaultTreeDepth)
 	}
 
 	// NOTE: Do not check for nil state or tree, allow panic in that case.
@@ -111,12 +124,14 @@ func balance(state *AppState, user string, tree *VouchTreeNode) int64 {
 		if proof, ok := state.ProofRecord(u); ok {
 			sum = int64(proof.Balance)
 		}
-		sum -= int64(penalty(state, u, nil))
+		// TODO: rebuilds the outgoing tree for u each time; could be optimized by caching
+		outgoingTree := graph.OutgoingTree(u, DefaultTreeDepth)
+		sum -= int64(penalty(state, u, outgoingTree))
 		balances[u] = sum
 		return sum
 	}
 
-	results := walkTreePostOrder(tree, func(node *VouchTreeNode, results map[*VouchTreeNode]int64) int64 {
+	results := walkTreePostOrder(incomingTree, func(node *VouchTreeNode, results map[*VouchTreeNode]int64) int64 {
 		total := baseBalance(node.User)
 		for _, edge := range node.Peers {
 			if edge.Peer == nil {
@@ -127,5 +142,5 @@ func balance(state *AppState, user string, tree *VouchTreeNode) int64 {
 		return total
 	})
 
-	return results[tree]
+	return results[incomingTree]
 }

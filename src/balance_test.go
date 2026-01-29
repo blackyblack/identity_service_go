@@ -103,6 +103,50 @@ func TestPenaltyInheritsFromVouchedUsers(t *testing.T) {
 	}
 }
 
+func TestBalanceEmptyStateNoProof(t *testing.T) {
+	state := NewAppState()
+
+	got := balance(state, "alice", nil)
+	if got != 0 {
+		t.Fatalf("expected balance 0, got %d", got)
+	}
+}
+
+func TestBalanceUserNotInGraphUsesDirectPenalties(t *testing.T) {
+	state := NewAppState()
+	state.AddVouch(VouchEvent{From: "alice", To: "bob"})
+	state.SetProof(ProofEvent{User: "mallory", Balance: 40})
+	state.AddPenalty(PenaltyEvent{User: "mallory", Amount: 12})
+	state.AddPenalty(PenaltyEvent{User: "alice", Amount: 50})
+
+	graph := state.VouchGraph()
+	if _, ok := graph.Nodes["mallory"]; ok {
+		t.Fatal("expected mallory to be absent from vouch graph")
+	}
+	tree := graph.IncomingTree("mallory", DefaultTreeDepth)
+	if got := len(tree.Peers); got != 0 {
+		t.Fatalf("expected no incoming peers for mallory, got %d", got)
+	}
+
+	got := balance(state, "mallory", nil)
+	if got != 28 {
+		t.Fatalf("expected balance 28, got %d", got)
+	}
+}
+
+func TestBalanceNegativeWhenPenaltiesExceedProof(t *testing.T) {
+	state := NewAppState()
+	state.AddVouch(VouchEvent{From: "bob", To: "alice"})
+
+	state.SetProof(ProofEvent{User: "bob", Balance: 10})
+	state.AddPenalty(PenaltyEvent{User: "bob", Amount: 50})
+
+	got := balance(state, "bob", nil)
+	if got != -40 {
+		t.Fatalf("expected balance -40, got %d", got)
+	}
+}
+
 func TestBalanceBuildsIncomingTree(t *testing.T) {
 	state := NewAppState()
 
