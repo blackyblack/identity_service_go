@@ -46,6 +46,7 @@ type AnyResponse struct {
 type IdtResponse struct {
 	User    string `json:"user"`
 	Balance int64  `json:"balance"`
+	Penalty uint64 `json:"penalty"`
 }
 
 func contentTypeApplicationJsonMiddleware(next http.Handler) http.Handler {
@@ -166,7 +167,7 @@ func idtHandler(state *AppState, w http.ResponseWriter, r *http.Request) {
 		sendErrorResponse(w, http.StatusBadRequest, err.Error())
 		return
 	}
-	response := IdtResponse{User: res.User, Balance: res.Balance}
+	response := IdtResponse{User: res.User, Balance: res.Balance, Penalty: res.Penalty}
 	data, err := json.Marshal(response)
 	if err != nil {
 		log.Printf("Failed to encode idt response to JSON: %v", err)
