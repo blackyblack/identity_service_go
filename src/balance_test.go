@@ -222,3 +222,43 @@ func TestBalanceAppliesTransientPenaltyFromOutgoingPeers(t *testing.T) {
 		t.Fatalf("expected balance 9, got %d", got)
 	}
 }
+
+func TestBalanceUsesTopVoucherBalances(t *testing.T) {
+	state := NewAppState()
+
+	vouchers := []struct {
+		user    string
+		balance uint64
+	}{
+		{user: "alice", balance: 10},
+		{user: "bruce", balance: 20},
+		{user: "carol", balance: 30},
+		{user: "dana", balance: 40},
+		{user: "erin", balance: 50},
+		{user: "frank", balance: 100},
+	}
+
+	for _, v := range vouchers {
+		state.AddVouch(VouchEvent{From: v.user, To: "bob"})
+		state.SetProof(ProofEvent{User: v.user, Balance: v.balance})
+	}
+
+	got := balance(state, "bob", nil)
+	// Top 5 voucher balances: 100 + 50 + 40 + 30 + 20 = 240; weighted by 10% = 24
+	if got != 24 {
+		t.Fatalf("expected balance 24, got %d", got)
+	}
+}
+
+func TestBalanceIgnoresNegativeVoucherBalance(t *testing.T) {
+	state := NewAppState()
+
+	state.AddVouch(VouchEvent{From: "mallory", To: "bob"})
+	state.SetProof(ProofEvent{User: "mallory", Balance: 10})
+	state.AddPenalty(PenaltyEvent{User: "mallory", Amount: 50})
+
+	got := balance(state, "bob", nil)
+	if got != 0 {
+		t.Fatalf("expected balance 0, got %d", got)
+	}
+}

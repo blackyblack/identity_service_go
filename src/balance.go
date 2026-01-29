@@ -1,9 +1,13 @@
 package main
 
-import "log"
+import (
+	"log"
+	"slices"
+)
 
 const penaltyWeightPerLayer = 0.1
 const balanceWeightPerLayer = 0.1
+const maxBalanceVouchers = 5
 
 type processFunc[T any] func(node *VouchTreeNode, results map[*VouchTreeNode]T) T
 
@@ -133,11 +137,23 @@ func balance(state *AppState, user string, incomingTree *VouchTreeNode) int64 {
 
 	results := walkTreePostOrder(incomingTree, func(node *VouchTreeNode, results map[*VouchTreeNode]int64) int64 {
 		total := baseBalance(node.User)
+		peerBalances := make([]int64, 0, len(node.Peers))
 		for _, edge := range node.Peers {
 			if edge.Peer == nil {
 				continue
 			}
-			total += int64(balanceWeightPerLayer * float64(results[edge.Peer]))
+			// Only consider positive balances from peers
+			if results[edge.Peer] <= 0 {
+				continue
+			}
+			peerBalances = append(peerBalances, results[edge.Peer])
+		}
+		slices.SortFunc(peerBalances, func(a, b int64) int {
+			return int(b - a)
+		})
+		limit := min(len(peerBalances), maxBalanceVouchers)
+		for i := 0; i < limit; i++ {
+			total += int64(balanceWeightPerLayer * float64(peerBalances[i]))
 		}
 		return total
 	})
