@@ -4,10 +4,12 @@ package main
 type IdtInfo struct {
 	User    string
 	Balance int64
+	Penalty uint64
 }
 
 // IdtHandler handles identity requests
 func IdtHandler(state *AppState, user string) (IdtInfo, IdentityError) {
-	balance := state.ModerationBalance(user)
-	return IdtInfo{User: user, Balance: balance}, nil
+	userBalance := balance(state, user, nil)
+	userPenalty := penalty(state, user, nil)
+	return IdtInfo{User: user, Balance: userBalance, Penalty: userPenalty}, nil
 }

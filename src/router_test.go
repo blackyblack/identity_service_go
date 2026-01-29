@@ -328,4 +328,7 @@ func TestIdtHandler_Success(t *testing.T) {
 	if resp.Balance != 0 {
 		t.Errorf("Expected balance 0, got %d", resp.Balance)
 	}
+	if resp.Penalty != 0 {
+		t.Errorf("Expected penalty 0, got %d", resp.Penalty)
+	}
 }
