@@ -4,7 +4,7 @@ const penaltyWeightPerLayer = 0.1
 
 type processFunc func(node *VouchTreeNode, results map[*VouchTreeNode]uint64) uint64
 
-// walkVouchTreePostOrder traverses the vouch tree in post-order and applies the process function to each node.
+// walkTreePostOrder traverses the vouch tree in post-order and applies the process function to each node.
 // It returns a map of nodes to their computed values.
 // Process function returns a single value for each node, i.e. balance.
 func walkTreePostOrder(root *VouchTreeNode, process processFunc) map[*VouchTreeNode]uint64 {

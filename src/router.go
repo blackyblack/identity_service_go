@@ -21,7 +21,7 @@ type VouchRequest struct {
 // ProofRequest represents the request body for the prove endpoint
 type ProofRequest struct {
 	User    string `json:"user"`
-	Balance int    `json:"balance"`
+	Balance uint64 `json:"balance"`
 
 	// TODO: add proof field
 	// TODO: add moderator's credentials
@@ -30,7 +30,7 @@ type ProofRequest struct {
 // PunishRequest represents the request body for the punish endpoint
 type PunishRequest struct {
 	User   string `json:"user"`
-	Amount int    `json:"amount"`
+	Amount uint64 `json:"amount"`
 
 	// TODO: add punish reason field
 	// TODO: add moderator's credentials
@@ -45,7 +45,7 @@ type AnyResponse struct {
 // IdtResponse represents the response for the idt endpoint
 type IdtResponse struct {
 	User    string `json:"user"`
-	Balance int    `json:"balance"`
+	Balance int64  `json:"balance"`
 }
 
 func contentTypeApplicationJsonMiddleware(next http.Handler) http.Handler {
@@ -110,7 +110,7 @@ func proveHandler(state *AppState, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.User == "" || req.Balance < 0 {
+	if req.User == "" {
 		sendErrorResponse(w, http.StatusBadRequest, "Missing required fields")
 		return
 	}
@@ -138,7 +138,7 @@ func punishHandler(state *AppState, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.User == "" || req.Amount <= 0 {
+	if req.User == "" {
 		sendErrorResponse(w, http.StatusBadRequest, "Missing required fields")
 		return
 	}

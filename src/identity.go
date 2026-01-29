@@ -3,7 +3,7 @@ package main
 // User's identity information
 type IdtInfo struct {
 	User    string
-	Balance int
+	Balance int64
 }
 
 // IdtHandler handles identity requests

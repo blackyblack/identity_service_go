@@ -59,3 +59,46 @@ func TestPenaltySumsUserPenalties(t *testing.T) {
 		t.Fatalf("expected penalty 17, got %d", got)
 	}
 }
+
+func TestPenaltyUserNotInGraphUsesDirectPenalties(t *testing.T) {
+	state := NewAppState()
+	state.AddVouch(VouchEvent{From: "alice", To: "bob"})
+	state.AddPenalty(PenaltyEvent{User: "mallory", Amount: 12})
+	state.AddPenalty(PenaltyEvent{User: "alice", Amount: 50})
+
+	graph := state.VouchGraph()
+	if _, ok := graph.Nodes["mallory"]; ok {
+		t.Fatal("expected mallory to be absent from vouch graph")
+	}
+	tree := graph.OutgoingTree("mallory", DefaultTreeDepth)
+	if got := len(tree.Peers); got != 0 {
+		t.Fatalf("expected no outgoing peers for mallory, got %d", got)
+	}
+
+	got := penalty(state, "mallory", nil)
+	if got != 12 {
+		t.Fatalf("expected penalty 12, got %d", got)
+	}
+}
+
+func TestPenaltyEmptyStateNoPenalties(t *testing.T) {
+	state := NewAppState()
+
+	got := penalty(state, "alice", nil)
+	if got != 0 {
+		t.Fatalf("expected penalty 0, got %d", got)
+	}
+}
+
+func TestPenaltyInheritsFromVouchedUsers(t *testing.T) {
+	state := NewAppState()
+	state.AddVouch(VouchEvent{From: "alice", To: "bob"})
+	state.AddVouch(VouchEvent{From: "alice", To: "carol"})
+	state.AddPenalty(PenaltyEvent{User: "bob", Amount: 50})
+	state.AddPenalty(PenaltyEvent{User: "carol", Amount: 70})
+
+	got := penalty(state, "alice", nil)
+	if got != 12 {
+		t.Fatalf("expected penalty 12, got %d", got)
+	}
+}
