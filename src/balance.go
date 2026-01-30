@@ -1,8 +1,8 @@
 package main
 
 import (
+	"container/heap"
 	"log"
-	"slices"
 )
 
 const penaltyWeightPerLayer = 0.1
@@ -52,6 +52,27 @@ func walkTreePostOrder[T any](root *VouchTreeNode, process processFunc[T]) map[*
 	}
 
 	return results
+}
+
+// An Heap is a min-heap struct.
+type Heap []int64
+
+func (h Heap) Len() int           { return len(h) }
+func (h Heap) Less(i, j int) bool { return h[i] < h[j] }
+func (h Heap) Swap(i, j int)      { h[i], h[j] = h[j], h[i] }
+
+func (h *Heap) Push(x any) {
+	// Push and Pop use pointer receivers because they modify the slice's length,
+	// not just its contents.
+	*h = append(*h, x.(int64))
+}
+
+func (h *Heap) Pop() any {
+	old := *h
+	n := len(old)
+	x := old[n-1]
+	*h = old[0 : n-1]
+	return x
 }
 
 // penalty computes the aggregated penalty for a user.
@@ -137,7 +158,8 @@ func balance(state *AppState, user string, incomingTree *VouchTreeNode) int64 {
 
 	results := walkTreePostOrder(incomingTree, func(node *VouchTreeNode, results map[*VouchTreeNode]int64) int64 {
 		total := baseBalance(node.User)
-		peerBalances := make([]int64, 0, len(node.Peers))
+		peerBalances := make(Heap, 0, len(node.Peers))
+		heap.Init(&peerBalances)
 		for _, edge := range node.Peers {
 			if edge.Peer == nil {
 				continue
@@ -146,14 +168,11 @@ func balance(state *AppState, user string, incomingTree *VouchTreeNode) int64 {
 			if results[edge.Peer] <= 0 {
 				continue
 			}
-			peerBalances = append(peerBalances, results[edge.Peer])
+			heap.Push(&peerBalances, results[edge.Peer])
 		}
-		slices.SortFunc(peerBalances, func(a, b int64) int {
-			return int(b - a)
-		})
-		limit := min(len(peerBalances), maxBalanceVouchers)
+		limit := min(peerBalances.Len(), maxBalanceVouchers)
 		for i := 0; i < limit; i++ {
-			total += int64(balanceWeightPerLayer * float64(peerBalances[i]))
+			total += int64(balanceWeightPerLayer * float64(peerBalances.Pop().(int64)))
 		}
 		return total
 	})
