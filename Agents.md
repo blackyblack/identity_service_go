@@ -1,4 +1,4 @@
-# agents.md - Session memory
+# Agents.md - Session memory
 
 Session memory is stored as `session.md` on a separate remote branch:
 - Code branch: <task-branch>
