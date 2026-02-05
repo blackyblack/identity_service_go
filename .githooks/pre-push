@@ -4,5 +4,5 @@ set -euo pipefail
 if [[ -x "./scripts/session_push.sh" ]]; then
   ./scripts/session_push.sh
 else
-  echo "session_push.sh not found or not executable; skipping session memory push" >&2
+  echo "./scripts/session_push.sh not found or not executable; skipping session memory push" >&2
 fi
