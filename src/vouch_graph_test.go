@@ -2,6 +2,17 @@ package main
 
 import "testing"
 
+func findEdgeByPeer(t *testing.T, edges []VouchTreeEdge, peerUser string) VouchTreeEdge {
+	t.Helper()
+	for _, edge := range edges {
+		if edge.Peer != nil && edge.Peer.User == peerUser {
+			return edge
+		}
+	}
+	t.Fatalf("expected edge to peer %q", peerUser)
+	return VouchTreeEdge{}
+}
+
 func TestVouchGraphOutgoingTreeDepth(t *testing.T) {
 	v1 := VouchEvent{From: "alice", To: "bob"}
 	v2 := VouchEvent{From: "bob", To: "carol"}
@@ -24,28 +35,24 @@ func TestVouchGraphOutgoingTreeDepth(t *testing.T) {
 	if got := len(tree.Peers); got != 2 {
 		t.Fatalf("expected 2 outgoing edges at depth 1, got %d", got)
 	}
-	if tree.Peers[0].Event != v1 {
-		t.Fatalf("unexpected outgoing edge 0: %#v", tree.Peers[0])
+	bobEdge := findEdgeByPeer(t, tree.Peers, "bob")
+	if bobEdge.Event != v1 {
+		t.Fatalf("unexpected outgoing edge for bob: %#v", bobEdge)
 	}
-	if tree.Peers[0].Peer.User != "bob" {
-		t.Fatalf("unexpected outgoing edge 0: %#v", tree.Peers[0])
+	if bobEdge.Peer.Depth != 1 {
+		t.Fatalf("unexpected outgoing edge for bob: %#v", bobEdge)
 	}
-	if tree.Peers[0].Peer.Depth != 1 {
-		t.Fatalf("unexpected outgoing edge 0: %#v", tree.Peers[0])
-	}
-	if got := len(tree.Peers[0].Peer.Peers); got != 0 {
+	if got := len(bobEdge.Peer.Peers); got != 0 {
 		t.Fatalf("expected bob to have no outgoing edges at depth 1, got %d", got)
 	}
-	if tree.Peers[1].Event != v3 {
-		t.Fatalf("unexpected outgoing edge 1: %#v", tree.Peers[1])
+	danEdge := findEdgeByPeer(t, tree.Peers, "dan")
+	if danEdge.Event != v3 {
+		t.Fatalf("unexpected outgoing edge for dan: %#v", danEdge)
 	}
-	if tree.Peers[1].Peer.User != "dan" {
-		t.Fatalf("unexpected outgoing edge 1: %#v", tree.Peers[1])
+	if danEdge.Peer.Depth != 1 {
+		t.Fatalf("unexpected outgoing edge for dan: %#v", danEdge)
 	}
-	if tree.Peers[1].Peer.Depth != 1 {
-		t.Fatalf("unexpected outgoing edge 1: %#v", tree.Peers[1])
-	}
-	if got := len(tree.Peers[1].Peer.Peers); got != 0 {
+	if got := len(danEdge.Peer.Peers); got != 0 {
 		t.Fatalf("expected dan to have no outgoing edges at depth 1, got %d", got)
 	}
 
@@ -53,17 +60,16 @@ func TestVouchGraphOutgoingTreeDepth(t *testing.T) {
 	if got := len(treeDepth2.Peers); got != 2 {
 		t.Fatalf("expected 2 outgoing edges at depth 2, got %d", got)
 	}
-	if got := len(treeDepth2.Peers[0].Peer.Peers); got != 1 {
+	bobEdgeDepth2 := findEdgeByPeer(t, treeDepth2.Peers, "bob")
+	if got := len(bobEdgeDepth2.Peer.Peers); got != 1 {
 		t.Fatalf("expected bob to have 1 outgoing edge at depth 2, got %d", got)
 	}
-	if treeDepth2.Peers[0].Peer.Peers[0].Event != v2 {
-		t.Fatalf("unexpected bob outgoing edge: %#v", treeDepth2.Peers[0].Peer.Peers[0])
+	carolEdge := findEdgeByPeer(t, bobEdgeDepth2.Peer.Peers, "carol")
+	if carolEdge.Event != v2 {
+		t.Fatalf("unexpected bob outgoing edge: %#v", carolEdge)
 	}
-	if treeDepth2.Peers[0].Peer.Peers[0].Peer.User != "carol" {
-		t.Fatalf("unexpected bob outgoing edge: %#v", treeDepth2.Peers[0].Peer.Peers[0])
-	}
-	if treeDepth2.Peers[0].Peer.Peers[0].Peer.Depth != 2 {
-		t.Fatalf("unexpected bob outgoing edge: %#v", treeDepth2.Peers[0].Peer.Peers[0])
+	if carolEdge.Peer.Depth != 2 {
+		t.Fatalf("unexpected bob outgoing edge: %#v", carolEdge)
 	}
 }
 
@@ -106,21 +112,24 @@ func TestVouchGraphOutgoingTreeBranchIndependence(t *testing.T) {
 	if got := len(tree.Peers); got != 2 {
 		t.Fatalf("expected 2 outgoing edges for root, got %d", got)
 	}
-	if tree.Peers[0].Event != v1 || tree.Peers[0].Peer.User != "alice" {
-		t.Fatalf("unexpected root outgoing edge 0: %#v", tree.Peers[0])
+	aliceEdge := findEdgeByPeer(t, tree.Peers, "alice")
+	if aliceEdge.Event != v1 {
+		t.Fatalf("unexpected root outgoing edge for alice: %#v", aliceEdge)
 	}
-	if got := len(tree.Peers[0].Peer.Peers); got != 0 {
+	if got := len(aliceEdge.Peer.Peers); got != 0 {
 		t.Fatalf("expected alice to have no outgoing edges at depth 2, got %d", got)
 	}
-	if tree.Peers[1].Event != v2 || tree.Peers[1].Peer.User != "bob" {
-		t.Fatalf("unexpected root outgoing edge 1: %#v", tree.Peers[1])
+	bobEdge := findEdgeByPeer(t, tree.Peers, "bob")
+	if bobEdge.Event != v2 {
+		t.Fatalf("unexpected root outgoing edge for bob: %#v", bobEdge)
 	}
-	bob := tree.Peers[1].Peer
+	bob := bobEdge.Peer
 	if got := len(bob.Peers); got != 1 {
 		t.Fatalf("expected bob to have 1 outgoing edge at depth 2, got %d", got)
 	}
-	if bob.Peers[0].Event != v3 || bob.Peers[0].Peer.User != "alice" {
-		t.Fatalf("unexpected bob outgoing edge: %#v", bob.Peers[0])
+	aliceFromBob := findEdgeByPeer(t, bob.Peers, "alice")
+	if aliceFromBob.Event != v3 {
+		t.Fatalf("unexpected bob outgoing edge: %#v", aliceFromBob)
 	}
 }
 
@@ -147,38 +156,32 @@ func TestVouchGraphIncomingTreeDepth(t *testing.T) {
 	if got := len(tree.Peers); got != 2 {
 		t.Fatalf("expected 2 incoming edges at depth 2, got %d", got)
 	}
-	if tree.Peers[0].Event != v1 {
-		t.Fatalf("unexpected incoming edge 0: %#v", tree.Peers[0])
+	aliceEdge := findEdgeByPeer(t, tree.Peers, "alice")
+	if aliceEdge.Event != v1 {
+		t.Fatalf("unexpected incoming edge for alice: %#v", aliceEdge)
 	}
-	if tree.Peers[0].Peer.User != "alice" {
-		t.Fatalf("unexpected incoming edge 0: %#v", tree.Peers[0])
+	if aliceEdge.Peer.Depth != 1 {
+		t.Fatalf("unexpected incoming edge for alice: %#v", aliceEdge)
 	}
-	if tree.Peers[0].Peer.Depth != 1 {
-		t.Fatalf("unexpected incoming edge 0: %#v", tree.Peers[0])
-	}
-	if got := len(tree.Peers[0].Peer.Peers); got != 0 {
+	if got := len(aliceEdge.Peer.Peers); got != 0 {
 		t.Fatalf("expected alice to have no incoming edges at depth 2, got %d", got)
 	}
-	if tree.Peers[1].Event != v2 {
-		t.Fatalf("unexpected incoming edge 1: %#v", tree.Peers[1])
+	carolEdge := findEdgeByPeer(t, tree.Peers, "carol")
+	if carolEdge.Event != v2 {
+		t.Fatalf("unexpected incoming edge for carol: %#v", carolEdge)
 	}
-	if tree.Peers[1].Peer.User != "carol" {
-		t.Fatalf("unexpected incoming edge 1: %#v", tree.Peers[1])
+	if carolEdge.Peer.Depth != 1 {
+		t.Fatalf("unexpected incoming edge for carol: %#v", carolEdge)
 	}
-	if tree.Peers[1].Peer.Depth != 1 {
-		t.Fatalf("unexpected incoming edge 1: %#v", tree.Peers[1])
-	}
-	if got := len(tree.Peers[1].Peer.Peers); got != 1 {
+	if got := len(carolEdge.Peer.Peers); got != 1 {
 		t.Fatalf("expected carol to have 1 incoming edge at depth 2, got %d", got)
 	}
-	if tree.Peers[1].Peer.Peers[0].Event != v3 {
-		t.Fatalf("unexpected carol incoming edge: %#v", tree.Peers[1].Peer.Peers[0])
+	danEdge := findEdgeByPeer(t, carolEdge.Peer.Peers, "dan")
+	if danEdge.Event != v3 {
+		t.Fatalf("unexpected carol incoming edge: %#v", danEdge)
 	}
-	if tree.Peers[1].Peer.Peers[0].Peer.User != "dan" {
-		t.Fatalf("unexpected carol incoming edge: %#v", tree.Peers[1].Peer.Peers[0])
-	}
-	if tree.Peers[1].Peer.Peers[0].Peer.Depth != 2 {
-		t.Fatalf("unexpected carol incoming edge: %#v", tree.Peers[1].Peer.Peers[0])
+	if danEdge.Peer.Depth != 2 {
+		t.Fatalf("unexpected carol incoming edge: %#v", danEdge)
 	}
 }
 
@@ -222,20 +225,23 @@ func TestVouchGraphIncomingTreeBranchIndependence(t *testing.T) {
 	if got := len(tree.Peers); got != 2 {
 		t.Fatalf("expected 2 incoming edges for root, got %d", got)
 	}
-	if tree.Peers[0].Event != v1 || tree.Peers[0].Peer.User != "alice" {
-		t.Fatalf("unexpected root incoming edge 0: %#v", tree.Peers[0])
+	aliceEdge := findEdgeByPeer(t, tree.Peers, "alice")
+	if aliceEdge.Event != v1 {
+		t.Fatalf("unexpected root incoming edge for alice: %#v", aliceEdge)
 	}
-	if got := len(tree.Peers[0].Peer.Peers); got != 0 {
+	if got := len(aliceEdge.Peer.Peers); got != 0 {
 		t.Fatalf("expected alice to have no incoming edges at depth 2, got %d", got)
 	}
-	if tree.Peers[1].Event != v2 || tree.Peers[1].Peer.User != "carol" {
-		t.Fatalf("unexpected root incoming edge 1: %#v", tree.Peers[1])
+	carolEdge := findEdgeByPeer(t, tree.Peers, "carol")
+	if carolEdge.Event != v2 {
+		t.Fatalf("unexpected root incoming edge for carol: %#v", carolEdge)
 	}
-	carol := tree.Peers[1].Peer
+	carol := carolEdge.Peer
 	if got := len(carol.Peers); got != 1 {
 		t.Fatalf("expected carol to have 1 incoming edge at depth 2, got %d", got)
 	}
-	if carol.Peers[0].Event != v3 || carol.Peers[0].Peer.User != "alice" {
-		t.Fatalf("unexpected carol incoming edge: %#v", carol.Peers[0])
+	aliceFromCarol := findEdgeByPeer(t, carol.Peers, "alice")
+	if aliceFromCarol.Event != v3 {
+		t.Fatalf("unexpected carol incoming edge: %#v", aliceFromCarol)
 	}
 }
