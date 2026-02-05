@@ -2,13 +2,15 @@ package main
 
 import "testing"
 
-func findEdgeByPeer(edges []VouchTreeEdge, peerUser string) (VouchTreeEdge, bool) {
+func edgeSet(edges []VouchTreeEdge) map[string]VouchTreeEdge {
+	set := make(map[string]VouchTreeEdge, len(edges))
 	for _, edge := range edges {
-		if edge.Peer != nil && edge.Peer.User == peerUser {
-			return edge, true
+		if edge.Peer == nil {
+			continue
 		}
+		set[edge.Peer.User] = edge
 	}
-	return VouchTreeEdge{}, false
+	return set
 }
 
 func TestVouchGraphOutgoingTreeDepth(t *testing.T) {
@@ -33,7 +35,8 @@ func TestVouchGraphOutgoingTreeDepth(t *testing.T) {
 	if got := len(tree.Peers); got != 2 {
 		t.Fatalf("expected 2 outgoing edges at depth 1, got %d", got)
 	}
-	bobEdge, ok := findEdgeByPeer(tree.Peers, "bob")
+	edgeByPeer := edgeSet(tree.Peers)
+	bobEdge, ok := edgeByPeer["bob"]
 	if !ok {
 		t.Fatalf("expected edge to peer %q", "bob")
 	}
@@ -46,7 +49,7 @@ func TestVouchGraphOutgoingTreeDepth(t *testing.T) {
 	if got := len(bobEdge.Peer.Peers); got != 0 {
 		t.Fatalf("expected bob to have no outgoing edges at depth 1, got %d", got)
 	}
-	danEdge, ok := findEdgeByPeer(tree.Peers, "dan")
+	danEdge, ok := edgeByPeer["dan"]
 	if !ok {
 		t.Fatalf("expected edge to peer %q", "dan")
 	}
@@ -64,14 +67,16 @@ func TestVouchGraphOutgoingTreeDepth(t *testing.T) {
 	if got := len(treeDepth2.Peers); got != 2 {
 		t.Fatalf("expected 2 outgoing edges at depth 2, got %d", got)
 	}
-	bobEdgeDepth2, ok := findEdgeByPeer(treeDepth2.Peers, "bob")
+	edgeByPeerDepth2 := edgeSet(treeDepth2.Peers)
+	bobEdgeDepth2, ok := edgeByPeerDepth2["bob"]
 	if !ok {
 		t.Fatalf("expected edge to peer %q", "bob")
 	}
 	if got := len(bobEdgeDepth2.Peer.Peers); got != 1 {
 		t.Fatalf("expected bob to have 1 outgoing edge at depth 2, got %d", got)
 	}
-	carolEdge, ok := findEdgeByPeer(bobEdgeDepth2.Peer.Peers, "carol")
+	edgeByPeerBob := edgeSet(bobEdgeDepth2.Peer.Peers)
+	carolEdge, ok := edgeByPeerBob["carol"]
 	if !ok {
 		t.Fatalf("expected edge to peer %q", "carol")
 	}
@@ -122,7 +127,8 @@ func TestVouchGraphOutgoingTreeBranchIndependence(t *testing.T) {
 	if got := len(tree.Peers); got != 2 {
 		t.Fatalf("expected 2 outgoing edges for root, got %d", got)
 	}
-	aliceEdge, ok := findEdgeByPeer(tree.Peers, "alice")
+	edgeByPeerRoot := edgeSet(tree.Peers)
+	aliceEdge, ok := edgeByPeerRoot["alice"]
 	if !ok {
 		t.Fatalf("expected edge to peer %q", "alice")
 	}
@@ -132,7 +138,7 @@ func TestVouchGraphOutgoingTreeBranchIndependence(t *testing.T) {
 	if got := len(aliceEdge.Peer.Peers); got != 0 {
 		t.Fatalf("expected alice to have no outgoing edges at depth 2, got %d", got)
 	}
-	bobEdge, ok := findEdgeByPeer(tree.Peers, "bob")
+	bobEdge, ok := edgeByPeerRoot["bob"]
 	if !ok {
 		t.Fatalf("expected edge to peer %q", "bob")
 	}
@@ -143,7 +149,8 @@ func TestVouchGraphOutgoingTreeBranchIndependence(t *testing.T) {
 	if got := len(bob.Peers); got != 1 {
 		t.Fatalf("expected bob to have 1 outgoing edge at depth 2, got %d", got)
 	}
-	aliceFromBob, ok := findEdgeByPeer(bob.Peers, "alice")
+	edgeByPeerBob := edgeSet(bob.Peers)
+	aliceFromBob, ok := edgeByPeerBob["alice"]
 	if !ok {
 		t.Fatalf("expected edge to peer %q", "alice")
 	}
@@ -175,7 +182,8 @@ func TestVouchGraphIncomingTreeDepth(t *testing.T) {
 	if got := len(tree.Peers); got != 2 {
 		t.Fatalf("expected 2 incoming edges at depth 2, got %d", got)
 	}
-	aliceEdge, ok := findEdgeByPeer(tree.Peers, "alice")
+	edgeByPeerIncoming := edgeSet(tree.Peers)
+	aliceEdge, ok := edgeByPeerIncoming["alice"]
 	if !ok {
 		t.Fatalf("expected edge to peer %q", "alice")
 	}
@@ -188,7 +196,7 @@ func TestVouchGraphIncomingTreeDepth(t *testing.T) {
 	if got := len(aliceEdge.Peer.Peers); got != 0 {
 		t.Fatalf("expected alice to have no incoming edges at depth 2, got %d", got)
 	}
-	carolEdge, ok := findEdgeByPeer(tree.Peers, "carol")
+	carolEdge, ok := edgeByPeerIncoming["carol"]
 	if !ok {
 		t.Fatalf("expected edge to peer %q", "carol")
 	}
@@ -201,7 +209,8 @@ func TestVouchGraphIncomingTreeDepth(t *testing.T) {
 	if got := len(carolEdge.Peer.Peers); got != 1 {
 		t.Fatalf("expected carol to have 1 incoming edge at depth 2, got %d", got)
 	}
-	danEdge, ok := findEdgeByPeer(carolEdge.Peer.Peers, "dan")
+	edgeByPeerCarol := edgeSet(carolEdge.Peer.Peers)
+	danEdge, ok := edgeByPeerCarol["dan"]
 	if !ok {
 		t.Fatalf("expected edge to peer %q", "dan")
 	}
@@ -253,7 +262,8 @@ func TestVouchGraphIncomingTreeBranchIndependence(t *testing.T) {
 	if got := len(tree.Peers); got != 2 {
 		t.Fatalf("expected 2 incoming edges for root, got %d", got)
 	}
-	aliceEdge, ok := findEdgeByPeer(tree.Peers, "alice")
+	edgeByPeerRoot := edgeSet(tree.Peers)
+	aliceEdge, ok := edgeByPeerRoot["alice"]
 	if !ok {
 		t.Fatalf("expected edge to peer %q", "alice")
 	}
@@ -263,7 +273,7 @@ func TestVouchGraphIncomingTreeBranchIndependence(t *testing.T) {
 	if got := len(aliceEdge.Peer.Peers); got != 0 {
 		t.Fatalf("expected alice to have no incoming edges at depth 2, got %d", got)
 	}
-	carolEdge, ok := findEdgeByPeer(tree.Peers, "carol")
+	carolEdge, ok := edgeByPeerRoot["carol"]
 	if !ok {
 		t.Fatalf("expected edge to peer %q", "carol")
 	}
@@ -274,7 +284,8 @@ func TestVouchGraphIncomingTreeBranchIndependence(t *testing.T) {
 	if got := len(carol.Peers); got != 1 {
 		t.Fatalf("expected carol to have 1 incoming edge at depth 2, got %d", got)
 	}
-	aliceFromCarol, ok := findEdgeByPeer(carol.Peers, "alice")
+	edgeByPeerCarol := edgeSet(carol.Peers)
+	aliceFromCarol, ok := edgeByPeerCarol["alice"]
 	if !ok {
 		t.Fatalf("expected edge to peer %q", "alice")
 	}
