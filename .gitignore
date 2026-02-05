@@ -24,3 +24,6 @@ go.work
 *.db-journal
 *.db-shm
 *.db-wal
+
+# Session memory file (MUST NOT be committed to code branch)
+session.md
