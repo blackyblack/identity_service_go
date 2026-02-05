@@ -1,10 +1,23 @@
 package main
 
-import "log"
+import (
+	"log"
+	"time"
+)
 
 // Wraps a Storage implementation to provide application-level operations.
 type AppState struct {
 	storage Storage
+	now     func() time.Time
+}
+
+// Returns the current time. Uses the overridable now function if set,
+// otherwise defaults to time.Now().UTC().
+func (s *AppState) currentTime() time.Time {
+	if s.now != nil {
+		return s.now()
+	}
+	return time.Now().UTC()
 }
 
 // Initializes an application state with in-memory storage.
@@ -91,17 +104,18 @@ func (s *AppState) Penalties(user string) []PenaltyEvent {
 
 // Computes a user's balance as the proof balance minus penalties.
 // If no proof record exists, the base balance is 0.
+// Both proof balance and penalty amounts are subject to time-based decay.
 func (s *AppState) ModerationBalance(user string) int64 {
+	now := s.currentTime()
 	proof, err := s.ProofRecord(user)
 	if err != nil {
 		log.Printf("Error getting proof record for user %s: %v", user, err)
 		return 0
 	}
-	base := int64(proof.Balance)
+	base := int64(DecayedAmount(proof.Balance, proof.Timestamp, now))
 	penaltySum := int64(0)
-	// TODO: add penalty decay based on timestamp
 	for _, penalty := range s.Penalties(user) {
-		penaltySum += int64(penalty.Amount)
+		penaltySum += int64(DecayedAmount(penalty.Amount, penalty.Timestamp, now))
 	}
 
 	return base - penaltySum
