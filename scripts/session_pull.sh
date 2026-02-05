@@ -17,15 +17,33 @@ fi
 
 SESSION_BRANCH="session/${TASK_BRANCH}"
 
+write_template() {
+  cat <<'EOF' > "$SESSION_FILE"
+# Session memory
+
+## Task and plan
+- 
+
+## Solution steps
+- 
+
+## Failed attempts
+- 
+
+## Issues encountered
+- 
+EOF
+}
+
 # Try to fetch session branch. If it doesn't exist, memory is empty.
 if git fetch "$REMOTE" "$SESSION_BRANCH" --quiet 2>/dev/null; then
   if git show "FETCH_HEAD:${SESSION_FILE}" > "$SESSION_FILE" 2>/dev/null; then
     echo "Loaded session memory from ${REMOTE}/${SESSION_BRANCH} into ${SESSION_FILE}"
   else
-    : > "$SESSION_FILE"
-    echo "Session branch exists but ${SESSION_FILE} missing - created empty ${SESSION_FILE}"
+    write_template
+    echo "Session branch exists but ${SESSION_FILE} missing - created template ${SESSION_FILE}"
   fi
 else
-  : > "$SESSION_FILE"
-  echo "No prior session memory for ${REMOTE}/${SESSION_BRANCH} - created empty ${SESSION_FILE}"
+  write_template
+  echo "No prior session memory for ${REMOTE}/${SESSION_BRANCH} - created template ${SESSION_FILE}"
 fi

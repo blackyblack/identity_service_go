@@ -8,6 +8,8 @@ Session memory is stored as `session.md` on branch `session/<task-branch>`.
 **Start of session:** `./scripts/session_pull.sh`  
 **End of session:** Update `session.md`, then `./scripts/session_push.sh`
 
+`session_pull.sh` seeds `session.md` with a template if no prior memory exists. Fill it in as you work and keep it updated through the session.
+
 ## What to store in session.md
 
 1. **Task and plan** — Record the task description and initial plan first
