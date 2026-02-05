@@ -2,7 +2,6 @@ package main
 
 import (
 	"database/sql"
-	"strings"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -87,18 +86,59 @@ func createTables(db *sql.DB) error {
 		return err
 	}
 
-	alterStatements := []string{
-		"ALTER TABLE vouches ADD COLUMN timestamp INTEGER NOT NULL DEFAULT 0",
-		"ALTER TABLE proofs ADD COLUMN timestamp INTEGER NOT NULL DEFAULT 0",
-		"ALTER TABLE penalties ADD COLUMN timestamp INTEGER NOT NULL DEFAULT 0",
+	if err := ensureColumn(db, "vouches", "timestamp",
+		"ALTER TABLE vouches ADD COLUMN timestamp INTEGER NOT NULL DEFAULT (strftime('%s','now'))"); err != nil {
+		return err
 	}
-	for _, statement := range alterStatements {
-		if _, err := db.Exec(statement); err != nil && !strings.Contains(err.Error(), "duplicate column name") {
-			return err
-		}
+	if err := ensureColumn(db, "proofs", "timestamp",
+		"ALTER TABLE proofs ADD COLUMN timestamp INTEGER NOT NULL DEFAULT (strftime('%s','now'))"); err != nil {
+		return err
+	}
+	if err := ensureColumn(db, "penalties", "timestamp",
+		"ALTER TABLE penalties ADD COLUMN timestamp INTEGER NOT NULL DEFAULT (strftime('%s','now'))"); err != nil {
+		return err
 	}
 
 	return nil
+}
+
+func ensureColumn(db *sql.DB, tableName string, columnName string, alterStatement string) error {
+	exists, err := columnExists(db, tableName, columnName)
+	if err != nil {
+		return err
+	}
+	if exists {
+		return nil
+	}
+	_, err = db.Exec(alterStatement)
+	return err
+}
+
+func columnExists(db *sql.DB, tableName string, columnName string) (bool, error) {
+	rows, err := db.Query("PRAGMA table_info(" + tableName + ")")
+	if err != nil {
+		return false, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var cid int
+		var name string
+		var columnType string
+		var notNull int
+		var defaultValue sql.NullString
+		var primaryKey int
+		if err := rows.Scan(&cid, &name, &columnType, &notNull, &defaultValue, &primaryKey); err != nil {
+			return false, err
+		}
+		if name == columnName {
+			return true, nil
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return false, err
+	}
+	return false, nil
 }
 
 // Returns all users who have vouches, proofs, or penalties recorded.
