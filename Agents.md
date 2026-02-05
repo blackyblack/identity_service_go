@@ -1,27 +1,23 @@
 # Agents.md - Session memory
 
-Session memory is stored as `session.md` on a separate remote branch:
-- Code branch: <task-branch>
-- Session branch: session/<task-branch>
-Rule: `session.md` MUST NOT be committed to the code branch.
+Session memory is stored as `session.md` on branch `session/<task-branch>`.  
+**Rule:** `session.md` MUST NOT be committed to the code branch.
 
-Agent workflow:
-1) Start of task session:
-   - Run: `./scripts/session_pull.sh`
-   - Outcome:
-     - If session branch exists, `session.md` is populated.
-     - If not, `session.md` is created empty (new task forked from main).
+## Workflow
 
-2) End of task session:
-   - Update `session.md` with your notes.
-   - Run: `./scripts/session_push.sh`
-   - Outcome:
-     - Session branch is updated with a single rolling commit (no history growth).
+**Start of session:** `./scripts/session_pull.sh`  
+**End of session:** Update `session.md`, then `./scripts/session_push.sh`
 
-Cleanup:
-- Session branches are deleted automatically when the PR is merged (GitHub Actions).
-- Manual cleanup (if needed): run workflow "Session branch cleanup" or delete:
-  `git push origin --delete session/<task-branch>`
+## What to store in session.md
 
-Notes:
-- If `session_push.sh` fails with a lease/conflict error, run pull -> merge your notes -> push again.
+1. **Task and plan** — Record the task description and initial plan first
+2. **Solution steps** — Document each step taken to solve the task
+3. **Failed attempts** — Log what didn't work and why
+4. **Issues encountered** — Note blockers, errors, and how they were resolved
+
+Persist all important steps so the task solution flow can be reproduced.
+
+## Cleanup
+
+Session branches are deleted automatically when the PR is merged.  
+Manual: `git push origin --delete session/<task-branch>`
