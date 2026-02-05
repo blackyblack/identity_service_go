@@ -1,4 +1,4 @@
-# Agents.md - Session memory
+# copilot-instructions.md - Session memory
 
 Session memory is stored as `session.md` on branch `copilot/session/<task-branch>`.  
 **Rule:** `session.md` MUST NOT be committed to the code branch.
