@@ -1,95 +1,113 @@
 package main
 
-import "sync"
+import "log"
 
-// AppState stores in-memory application data.
+// Wraps a Storage implementation to provide application-level operations.
 type AppState struct {
-	mu      sync.RWMutex
-	vouches []VouchEvent
-	proofs  map[string]ProofEvent
-	// Penalties per user
-	penalties map[string][]PenaltyEvent
-
-	// TODO: maybe keep vouch graph cached here?
+	storage Storage
 }
 
-// NewAppState initializes an empty application state.
+// Initializes an application state with in-memory storage.
 func NewAppState() *AppState {
 	return &AppState{
-		vouches:   make([]VouchEvent, 0),
-		proofs:    make(map[string]ProofEvent),
-		penalties: make(map[string][]PenaltyEvent),
+		storage: NewMemoryStorage(),
 	}
 }
 
-// AddVouch records an incoming vouch event.
+// Initializes an application state with a specific storage implementation.
+func NewAppStateWithStorage(storage Storage) *AppState {
+	return &AppState{
+		storage: storage,
+	}
+}
+
+// Returns all users.
+func (s *AppState) Users() []string {
+	users, err := s.storage.Users()
+	if err != nil {
+		log.Printf("Error getting users: %v", err)
+		return []string{}
+	}
+	return users
+}
+
+// Records an incoming vouch event.
 func (s *AppState) AddVouch(vouch VouchEvent) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.vouches = append(s.vouches, vouch)
+	if err := s.storage.AddVouch(vouch); err != nil {
+		log.Printf("Error adding vouch: %v", err)
+	}
 }
 
-// Vouches returns a copy of all stored vouches.
-func (s *AppState) Vouches() []VouchEvent {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	vouchesCopy := make([]VouchEvent, len(s.vouches))
-	copy(vouchesCopy, s.vouches)
-	return vouchesCopy
+func (s *AppState) UserVouchesFrom(user string) []VouchEvent {
+	vouches, err := s.storage.UserVouchesFrom(user)
+	if err != nil {
+		log.Printf("Error getting vouches from user %s: %v", user, err)
+		return []VouchEvent{}
+	}
+	return vouches
 }
 
-// VouchGraph builds a vouch graph from the stored vouches.
-func (s *AppState) VouchGraph() VouchGraph {
-	return BuildVouchGraph(s.Vouches())
+func (s *AppState) UserVouchesTo(user string) []VouchEvent {
+	vouches, err := s.storage.UserVouchesTo(user)
+	if err != nil {
+		log.Printf("Error getting vouches to user %s: %v", user, err)
+		return []VouchEvent{}
+	}
+	return vouches
 }
 
-// SetProof stores the latest proof event for a user, replacing any prior record.
+// Stores the latest proof event for a user, replacing any prior record.
 func (s *AppState) SetProof(proof ProofEvent) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.proofs[proof.User] = proof
+	if err := s.storage.SetProof(proof); err != nil {
+		log.Printf("Error setting proof: %v", err)
+	}
 }
 
-// ProofRecord returns the stored proof event for a user, if any.
-func (s *AppState) ProofRecord(user string) (ProofEvent, bool) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	proof, ok := s.proofs[user]
-	return proof, ok
+// Returns the stored proof event for a user, if any.
+func (s *AppState) ProofRecord(user string) (ProofEvent, error) {
+	proof, err := s.storage.ProofRecord(user)
+	if err != nil {
+		return ProofEvent{}, err
+	}
+	return proof, nil
 }
 
-// AddPenalty records a penalty event.
+// Records a penalty event.
 func (s *AppState) AddPenalty(penalty PenaltyEvent) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.penalties[penalty.User] = append(s.penalties[penalty.User], penalty)
+	if err := s.storage.AddPenalty(penalty); err != nil {
+		log.Printf("Error adding penalty: %v", err)
+	}
 }
 
-// Penalties returns a copy of all stored penalties per user.
+// Returns all stored penalties for a user.
 func (s *AppState) Penalties(user string) []PenaltyEvent {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	penaltiesCopy := make([]PenaltyEvent, len(s.penalties[user]))
-	copy(penaltiesCopy, s.penalties[user])
-	return penaltiesCopy
+	penalties, err := s.storage.Penalties(user)
+	if err != nil {
+		log.Printf("Error getting penalties: %v", err)
+		return []PenaltyEvent{}
+	}
+	return penalties
 }
 
-// ModerationBalance computes a user's balance as the proof balance minus penalties.
+// Computes a user's balance as the proof balance minus penalties.
 // If no proof record exists, the base balance is 0.
 func (s *AppState) ModerationBalance(user string) int64 {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	base := int64(0)
-	if proof, ok := s.proofs[user]; ok {
-		base = int64(proof.Balance)
+	proof, err := s.ProofRecord(user)
+	if err != nil {
+		log.Printf("Error getting proof record for user %s: %v", user, err)
+		return 0
 	}
-
+	base := int64(proof.Balance)
 	penaltySum := int64(0)
 	// TODO: add penalty decay based on timestamp
-	for _, penalty := range s.penalties[user] {
+	for _, penalty := range s.Penalties(user) {
 		penaltySum += int64(penalty.Amount)
 	}
 
 	return base - penaltySum
+}
+
+// Releases any resources used by the storage.
+func (s *AppState) Close() error {
+	return s.storage.Close()
 }

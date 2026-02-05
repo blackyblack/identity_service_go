@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-// TestVouchHandler_Success tests the vouch endpoint with valid input
+// Tests the vouch endpoint with valid input
 func TestVouchHandler_Success(t *testing.T) {
 	appState := NewAppState()
 	reqBody := VouchRequest{
@@ -46,7 +46,7 @@ func TestVouchHandler_Success(t *testing.T) {
 	}
 }
 
-// TestVouchHandler_MissingFields tests the vouch endpoint with missing fields
+// Tests the vouch endpoint with missing fields
 func TestVouchHandler_MissingFields(t *testing.T) {
 	appState := NewAppState()
 	reqBody := VouchRequest{
@@ -83,7 +83,7 @@ func TestVouchHandler_MissingFields(t *testing.T) {
 	}
 }
 
-// TestVouchHandler_InvalidJSON tests the vouch endpoint with invalid JSON
+// Tests the vouch endpoint with invalid JSON
 func TestVouchHandler_InvalidJSON(t *testing.T) {
 	appState := NewAppState()
 	req := httptest.NewRequest("POST", "/vouch", bytes.NewBufferString("invalid json"))
@@ -138,8 +138,8 @@ func TestProveHandler_Success(t *testing.T) {
 		t.Fatalf("Expected message 'Proof accepted', got '%s'", resp.Message)
 	}
 
-	proof, ok := appState.ProofRecord("user1")
-	if !ok {
+	proof, err := appState.ProofRecord("user1")
+	if err != nil {
 		t.Fatal("expected proof record for user1")
 	}
 	if proof.Balance != 42 {
@@ -147,7 +147,7 @@ func TestProveHandler_Success(t *testing.T) {
 	}
 }
 
-// TestProveHandler_MissingFields tests the prove endpoint with missing user field
+// Tests the prove endpoint with missing user field
 func TestProveHandler_MissingFields(t *testing.T) {
 	appState := NewAppState()
 	reqBody := ProofRequest{
@@ -183,7 +183,7 @@ func TestProveHandler_MissingFields(t *testing.T) {
 	}
 }
 
-// TestProveHandler_InvalidJSON tests the prove endpoint with invalid JSON
+// Tests the prove endpoint with invalid JSON
 func TestProveHandler_InvalidJSON(t *testing.T) {
 	appState := NewAppState()
 	req := httptest.NewRequest("POST", "/prove", bytes.NewBufferString("invalid json"))
@@ -245,7 +245,7 @@ func TestPunishHandler_Success(t *testing.T) {
 	}
 }
 
-// TestPunishHandler_MissingFields tests the punish endpoint with missing user field
+// Tests the punish endpoint with missing user field
 func TestPunishHandler_MissingFields(t *testing.T) {
 	appState := NewAppState()
 	reqBody := PunishRequest{
@@ -281,7 +281,7 @@ func TestPunishHandler_MissingFields(t *testing.T) {
 	}
 }
 
-// TestPunishHandler_InvalidJSON tests the punish endpoint with invalid JSON
+// Tests the punish endpoint with invalid JSON
 func TestPunishHandler_InvalidJSON(t *testing.T) {
 	appState := NewAppState()
 	req := httptest.NewRequest("POST", "/punish", bytes.NewBufferString("invalid json"))
@@ -304,9 +304,9 @@ func TestPunishHandler_InvalidJSON(t *testing.T) {
 	}
 }
 
-// TestIdtHandler_Success tests the idt endpoint with a valid user parameter
+// Tests the idt endpoint with a valid user parameter
 func TestIdtHandler_Success(t *testing.T) {
-	router := setupRouter()
+	router := SetupRouter()
 
 	req := httptest.NewRequest("GET", "/idt/testuser", nil)
 	w := httptest.NewRecorder()

@@ -7,9 +7,9 @@ type IdtInfo struct {
 	Penalty uint64
 }
 
-// IdtHandler handles identity requests
+// Handles identity requests
 func IdtHandler(state *AppState, user string) (IdtInfo, IdentityError) {
-	userBalance := balance(state, user, nil)
-	userPenalty := penalty(state, user, nil)
+	userBalance := Balance(state, user, nil)
+	userPenalty := Penalty(state, user, nil)
 	return IdtInfo{User: user, Balance: userBalance, Penalty: userPenalty}, nil
 }

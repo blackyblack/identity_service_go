@@ -10,7 +10,7 @@ import (
 
 const PORT int = 8080
 
-// VouchRequest represents the request body for the vouch endpoint
+// Represents the request body for the vouch endpoint
 type VouchRequest struct {
 	From      string `json:"from"`
 	Signature string `json:"signature"`
@@ -18,7 +18,7 @@ type VouchRequest struct {
 	To        string `json:"to"`
 }
 
-// ProofRequest represents the request body for the prove endpoint
+// Represents the request body for the prove endpoint
 type ProofRequest struct {
 	User    string `json:"user"`
 	Balance uint64 `json:"balance"`
@@ -27,7 +27,7 @@ type ProofRequest struct {
 	// TODO: add moderator's credentials
 }
 
-// PunishRequest represents the request body for the punish endpoint
+// Represents the request body for the punish endpoint
 type PunishRequest struct {
 	User   string `json:"user"`
 	Amount uint64 `json:"amount"`
@@ -36,13 +36,13 @@ type PunishRequest struct {
 	// TODO: add moderator's credentials
 }
 
-// AnyResponse represents the common response
+// Represents the common response
 type AnyResponse struct {
 	Success bool   `json:"success"`
 	Message string `json:"message"`
 }
 
-// IdtResponse represents the response for the idt endpoint
+// Represents the response for the idt endpoint
 type IdtResponse struct {
 	User    string `json:"user"`
 	Balance int64  `json:"balance"`
@@ -56,7 +56,7 @@ func contentTypeApplicationJsonMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// sendErrorResponse sends a JSON error response with the given status code and message.
+// Sends a JSON error response with the given status code and message.
 func sendErrorResponse(w http.ResponseWriter, statusCode int, message string) {
 	data, err := json.Marshal(AnyResponse{Success: false, Message: message})
 	if err != nil {
@@ -68,13 +68,13 @@ func sendErrorResponse(w http.ResponseWriter, statusCode int, message string) {
 	w.Write(data)
 }
 
-// sendInternalError sends a generic internal server error response.
+// Sends a generic internal server error response.
 func sendInternalError(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "text/plain")
 	http.Error(w, "Failed to encode error response", http.StatusInternalServerError)
 }
 
-// vouchHandler handles POST requests to /vouch
+// Handles POST requests to /vouch
 func vouchHandler(state *AppState, w http.ResponseWriter, r *http.Request) {
 	var req VouchRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -103,7 +103,7 @@ func vouchHandler(state *AppState, w http.ResponseWriter, r *http.Request) {
 	w.Write(data)
 }
 
-// proveHandler handles POST requests to /prove
+// Handles POST requests to /prove
 func proveHandler(state *AppState, w http.ResponseWriter, r *http.Request) {
 	var req ProofRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -131,7 +131,7 @@ func proveHandler(state *AppState, w http.ResponseWriter, r *http.Request) {
 	w.Write(data)
 }
 
-// punishHandler handles POST requests to /punish
+// Handles POST requests to /punish
 func punishHandler(state *AppState, w http.ResponseWriter, r *http.Request) {
 	var req PunishRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -159,7 +159,7 @@ func punishHandler(state *AppState, w http.ResponseWriter, r *http.Request) {
 	w.Write(data)
 }
 
-// idtHandler handles GET requests to /idt/:user
+// Handles GET requests to /idt/:user
 func idtHandler(state *AppState, w http.ResponseWriter, r *http.Request) {
 	user := mux.Vars(r)["user"]
 	res, err := IdtHandler(state, user)
@@ -177,8 +177,8 @@ func idtHandler(state *AppState, w http.ResponseWriter, r *http.Request) {
 	w.Write(data)
 }
 
-// setupRouter creates and configures the HTTP router
-func setupRouter() *mux.Router {
+// Creates and configures the HTTP router
+func SetupRouter() *mux.Router {
 	appState := NewAppState()
 	router := mux.NewRouter()
 	router.Use(contentTypeApplicationJsonMiddleware)
