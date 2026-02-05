@@ -1,0 +1,56 @@
+name: Session branch cleanup
+
+on:
+  # Automatic cleanup when PR is merged
+  pull_request:
+    types: [closed]
+  
+  # Manual cleanup via workflow_dispatch
+  workflow_dispatch:
+    inputs:
+      branch_name:
+        description: 'Task branch name (without session/ prefix) to clean up'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup-on-merge:
+    if: github.event_name == 'pull_request' && github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete session branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          SESSION_BRANCH="session/${{ github.event.pull_request.head.ref }}"
+          echo "Attempting to delete session branch: ${SESSION_BRANCH}"
+          
+          # Check if session branch exists and delete it
+          if git ls-remote --heads origin "${SESSION_BRANCH}" | grep -q "${SESSION_BRANCH}"; then
+            gh api -X DELETE "repos/${{ github.repository }}/git/refs/heads/${SESSION_BRANCH}" || echo "Branch already deleted or doesn't exist"
+            echo "Deleted session branch: ${SESSION_BRANCH}"
+          else
+            echo "Session branch ${SESSION_BRANCH} does not exist, nothing to delete"
+          fi
+
+  cleanup-manual:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete session branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          SESSION_BRANCH="session/${{ github.event.inputs.branch_name }}"
+          echo "Attempting to delete session branch: ${SESSION_BRANCH}"
+          
+          # Check if session branch exists and delete it
+          if git ls-remote --heads origin "${SESSION_BRANCH}" | grep -q "${SESSION_BRANCH}"; then
+            gh api -X DELETE "repos/${{ github.repository }}/git/refs/heads/${SESSION_BRANCH}" || echo "Branch already deleted or doesn't exist"
+            echo "Deleted session branch: ${SESSION_BRANCH}"
+          else
+            echo "Session branch ${SESSION_BRANCH} does not exist, nothing to delete"
+          fi
