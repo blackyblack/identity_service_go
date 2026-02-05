@@ -91,8 +91,6 @@ func TestAppStateSetProofReplacesExisting(t *testing.T) {
 func TestAppStateModerationBalanceSubtractsPenalties(t *testing.T) {
 	state := NewAppState()
 
-	// TODO: update test when penalty decay is implemented
-
 	state.SetProof(ProofEvent{User: "alice", Balance: 100})
 	state.AddPenalty(PenaltyEvent{User: "alice", Amount: 10})
 	state.AddPenalty(PenaltyEvent{User: "alice", Amount: 15})

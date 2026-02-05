@@ -3,11 +3,31 @@ package main
 import (
 	"container/heap"
 	"log"
+	"time"
 )
 
 const penaltyWeightPerLayer = 0.1
 const balanceWeightPerLayer = 0.1
 const maxBalanceVouchers = 5
+
+// DecayedAmount computes the value after applying time-based decay.
+// The amount decreases by 1 per day elapsed since the timestamp.
+// Returns 0 if the decayed value would go negative.
+// If timestamp is zero, no decay is applied.
+func DecayedAmount(amount uint64, timestamp time.Time, now time.Time) uint64 {
+	if timestamp.IsZero() {
+		return amount
+	}
+	elapsed := now.Sub(timestamp)
+	if elapsed <= 0 {
+		return amount
+	}
+	days := uint64(elapsed / (24 * time.Hour))
+	if days >= amount {
+		return 0
+	}
+	return amount - days
+}
 
 // An Heap is a min-heap struct.
 type Heap []int64
@@ -45,7 +65,7 @@ func Penalty(state *AppState, user string, tree *VouchTreeNode) uint64 {
 
 	// NOTE: Do not check for nil state or tree, allow panic in that case.
 
-	// TODO: apply penalty decay based on timestamp
+	now := state.currentTime()
 
 	penaltySums := make(map[string]uint64)
 	basePenalty := func(u string) uint64 {
@@ -55,7 +75,7 @@ func Penalty(state *AppState, user string, tree *VouchTreeNode) uint64 {
 		sum := uint64(0)
 		userPenalties := state.Penalties(u)
 		for _, p := range userPenalties {
-			sum += uint64(p.Amount)
+			sum += DecayedAmount(p.Amount, p.Timestamp, now)
 		}
 		penaltySums[u] = sum
 		return sum
@@ -90,7 +110,7 @@ func Balance(state *AppState, user string, incomingTree *VouchTreeNode) int64 {
 
 	// NOTE: Do not check for nil state or tree, allow panic in that case.
 
-	// TODO: apply balance decay based on timestamp
+	now := state.currentTime()
 
 	balances := make(map[string]int64)
 	baseBalance := func(u string) int64 {
@@ -102,7 +122,7 @@ func Balance(state *AppState, user string, incomingTree *VouchTreeNode) int64 {
 		if err != nil {
 			log.Printf("Error getting proof record for user %s: %v", u, err)
 		} else {
-			sum = int64(proof.Balance)
+			sum = int64(DecayedAmount(proof.Balance, proof.Timestamp, now))
 		}
 
 		// TODO: rebuilds the outgoing tree for u each time; could be optimized by caching

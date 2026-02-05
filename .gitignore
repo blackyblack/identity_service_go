@@ -5,6 +5,7 @@
 *.so
 *.dylib
 identity_service_go
+src/src
 
 # Test binary, built with `go test -c`
 *.test
