@@ -350,6 +350,24 @@ func TestStorageMultipleUsers(t *testing.T) {
 			t.Fatalf("expected 1 vouch, got %d", len(vouches))
 		}
 
+		users, err := storage.Users()
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		userSet := make(map[string]struct{}, len(users))
+		for _, user := range users {
+			userSet[user] = struct{}{}
+		}
+		expectedUsers := []string{"alice", "bob", "carol"}
+		if len(userSet) != len(expectedUsers) {
+			t.Fatalf("expected %d users, got %d", len(expectedUsers), len(userSet))
+		}
+		for _, user := range expectedUsers {
+			if _, ok := userSet[user]; !ok {
+				t.Fatalf("expected user %q to exist", user)
+			}
+		}
+
 		// Verify proofs
 		aliceProof, err := storage.ProofRecord("alice")
 		if err != nil {
