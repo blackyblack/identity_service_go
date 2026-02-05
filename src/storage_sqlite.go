@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"time"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -34,6 +35,7 @@ func createTables(db *sql.DB) error {
 		CREATE TABLE IF NOT EXISTS vouches (
 			from_user TEXT NOT NULL,
 			to_user TEXT NOT NULL,
+			timestamp INTEGER NOT NULL,
 			PRIMARY KEY (from_user, to_user)
 		)
 	`)
@@ -57,7 +59,8 @@ func createTables(db *sql.DB) error {
 	_, err = db.Exec(`
 		CREATE TABLE IF NOT EXISTS proofs (
 			user TEXT PRIMARY KEY,
-			balance INTEGER NOT NULL
+			balance INTEGER NOT NULL,
+			timestamp INTEGER NOT NULL
 		)
 	`)
 	if err != nil {
@@ -69,7 +72,8 @@ func createTables(db *sql.DB) error {
 		CREATE TABLE IF NOT EXISTS penalties (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			user TEXT NOT NULL,
-			amount INTEGER NOT NULL
+			amount INTEGER NOT NULL,
+			timestamp INTEGER NOT NULL
 		)
 	`)
 	if err != nil {
@@ -120,13 +124,18 @@ func (s *SQLiteStorage) Users() ([]string, error) {
 
 // Records an incoming vouch event.
 func (s *SQLiteStorage) AddVouch(vouch VouchEvent) error {
-	_, err := s.db.Exec("REPLACE INTO vouches (from_user, to_user) VALUES (?, ?)", vouch.From, vouch.To)
+	_, err := s.db.Exec(
+		"REPLACE INTO vouches (from_user, to_user, timestamp) VALUES (?, ?, ?)",
+		vouch.From,
+		vouch.To,
+		vouch.Timestamp.Unix(),
+	)
 	return err
 }
 
 // Returns a copy of all stored outgoing vouches for a specific user.
 func (s *SQLiteStorage) UserVouchesFrom(user string) ([]VouchEvent, error) {
-	rows, err := s.db.Query("SELECT from_user, to_user FROM vouches WHERE from_user = ?", user)
+	rows, err := s.db.Query("SELECT from_user, to_user, timestamp FROM vouches WHERE from_user = ?", user)
 	if err != nil {
 		return nil, err
 	}
@@ -135,9 +144,11 @@ func (s *SQLiteStorage) UserVouchesFrom(user string) ([]VouchEvent, error) {
 	var vouches []VouchEvent
 	for rows.Next() {
 		var v VouchEvent
-		if err := rows.Scan(&v.From, &v.To); err != nil {
+		var timestamp int64
+		if err := rows.Scan(&v.From, &v.To, &timestamp); err != nil {
 			return nil, err
 		}
+		v.Timestamp = time.Unix(timestamp, 0).UTC()
 		vouches = append(vouches, v)
 	}
 	if err := rows.Err(); err != nil {
@@ -152,7 +163,7 @@ func (s *SQLiteStorage) UserVouchesFrom(user string) ([]VouchEvent, error) {
 
 // Returns a copy of all stored incoming vouches for a specific user.
 func (s *SQLiteStorage) UserVouchesTo(user string) ([]VouchEvent, error) {
-	rows, err := s.db.Query("SELECT from_user, to_user FROM vouches WHERE to_user = ?", user)
+	rows, err := s.db.Query("SELECT from_user, to_user, timestamp FROM vouches WHERE to_user = ?", user)
 	if err != nil {
 		return nil, err
 	}
@@ -161,9 +172,11 @@ func (s *SQLiteStorage) UserVouchesTo(user string) ([]VouchEvent, error) {
 	var vouches []VouchEvent
 	for rows.Next() {
 		var v VouchEvent
-		if err := rows.Scan(&v.From, &v.To); err != nil {
+		var timestamp int64
+		if err := rows.Scan(&v.From, &v.To, &timestamp); err != nil {
 			return nil, err
 		}
+		v.Timestamp = time.Unix(timestamp, 0).UTC()
 		vouches = append(vouches, v)
 	}
 	if err := rows.Err(); err != nil {
@@ -179,34 +192,45 @@ func (s *SQLiteStorage) UserVouchesTo(user string) ([]VouchEvent, error) {
 // Stores the latest proof event for a user, replacing any prior record.
 func (s *SQLiteStorage) SetProof(proof ProofEvent) error {
 	_, err := s.db.Exec(`
-		INSERT INTO proofs (user, balance) VALUES (?, ?)
-		ON CONFLICT(user) DO UPDATE SET balance = excluded.balance
-	`, proof.User, proof.Balance)
+		INSERT INTO proofs (user, balance, timestamp) VALUES (?, ?, ?)
+		ON CONFLICT(user) DO UPDATE SET balance = excluded.balance, timestamp = excluded.timestamp
+	`, proof.User, proof.Balance, proof.Timestamp.Unix())
 	return err
 }
 
 // Returns the stored proof event for a user, if any.
 func (s *SQLiteStorage) ProofRecord(user string) (ProofEvent, error) {
 	var proof ProofEvent
-	err := s.db.QueryRow("SELECT user, balance FROM proofs WHERE user = ?", user).Scan(&proof.User, &proof.Balance)
+	var timestamp int64
+	err := s.db.QueryRow("SELECT user, balance, timestamp FROM proofs WHERE user = ?", user).Scan(
+		&proof.User,
+		&proof.Balance,
+		&timestamp,
+	)
 	if err == sql.ErrNoRows {
 		return ProofEvent{User: user}, nil
 	}
 	if err != nil {
 		return ProofEvent{User: user}, err
 	}
+	proof.Timestamp = time.Unix(timestamp, 0).UTC()
 	return proof, nil
 }
 
 // Records a penalty event.
 func (s *SQLiteStorage) AddPenalty(penalty PenaltyEvent) error {
-	_, err := s.db.Exec("INSERT INTO penalties (user, amount) VALUES (?, ?)", penalty.User, penalty.Amount)
+	_, err := s.db.Exec(
+		"INSERT INTO penalties (user, amount, timestamp) VALUES (?, ?, ?)",
+		penalty.User,
+		penalty.Amount,
+		penalty.Timestamp.Unix(),
+	)
 	return err
 }
 
 // Returns all stored penalties for a user.
 func (s *SQLiteStorage) Penalties(user string) ([]PenaltyEvent, error) {
-	rows, err := s.db.Query("SELECT user, amount FROM penalties WHERE user = ? ORDER BY id", user)
+	rows, err := s.db.Query("SELECT user, amount, timestamp FROM penalties WHERE user = ? ORDER BY id", user)
 	if err != nil {
 		return nil, err
 	}
@@ -215,9 +239,11 @@ func (s *SQLiteStorage) Penalties(user string) ([]PenaltyEvent, error) {
 	var penalties []PenaltyEvent
 	for rows.Next() {
 		var p PenaltyEvent
-		if err := rows.Scan(&p.User, &p.Amount); err != nil {
+		var timestamp int64
+		if err := rows.Scan(&p.User, &p.Amount, &timestamp); err != nil {
 			return nil, err
 		}
+		p.Timestamp = time.Unix(timestamp, 0).UTC()
 		penalties = append(penalties, p)
 	}
 	if err := rows.Err(); err != nil {

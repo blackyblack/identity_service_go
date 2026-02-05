@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       branch_name:
-        description: 'Task branch name (without session/ prefix) to clean up'
+        description: 'Task branch name (without copilot/session/ prefix) to clean up'
         required: true
         type: string
 
@@ -25,7 +25,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          SESSION_BRANCH="session/${{ github.event.pull_request.head.ref }}"
+          SESSION_BRANCH="copilot/session/${{ github.event.pull_request.head.ref }}"
           echo "Attempting to delete session branch: ${SESSION_BRANCH}"
           
           # Use GitHub API to check if branch exists and delete it
@@ -44,7 +44,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          SESSION_BRANCH="session/${{ github.event.inputs.branch_name }}"
+          SESSION_BRANCH="copilot/session/${{ github.event.inputs.branch_name }}"
           echo "Attempting to delete session branch: ${SESSION_BRANCH}"
           
           # Use GitHub API to check if branch exists and delete it
