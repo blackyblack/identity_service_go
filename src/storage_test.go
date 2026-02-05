@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"testing"
+	"time"
 )
 
 // Creates a new Storage instance
@@ -74,8 +75,9 @@ func TestStorageEmpty(t *testing.T) {
 
 func TestStorageAddVouch(t *testing.T) {
 	testStorageImplementations(t, "AddVouch", func(t *testing.T, storage Storage) {
-		v1 := VouchEvent{From: "alice", To: "bob"}
-		v2 := VouchEvent{From: "bob", To: "carol"}
+		timestamp := time.Date(2024, time.January, 2, 3, 4, 5, 0, time.UTC)
+		v1 := VouchEvent{From: "alice", To: "bob", Timestamp: timestamp}
+		v2 := VouchEvent{From: "bob", To: "carol", Timestamp: timestamp.Add(time.Minute)}
 
 		if err := storage.AddVouch(v1); err != nil {
 			t.Fatalf("unexpected error adding vouch: %v", err)
@@ -169,7 +171,8 @@ func TestStorageVouchesReturnsCopy(t *testing.T) {
 
 func TestStorageSetProof(t *testing.T) {
 	testStorageImplementations(t, "SetProof", func(t *testing.T, storage Storage) {
-		proof := ProofEvent{User: "alice", Balance: 100}
+		timestamp := time.Date(2024, time.February, 3, 4, 5, 6, 0, time.UTC)
+		proof := ProofEvent{User: "alice", Balance: 100, Timestamp: timestamp}
 		if err := storage.SetProof(proof); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -180,6 +183,9 @@ func TestStorageSetProof(t *testing.T) {
 		}
 		if got.User != "alice" || got.Balance != 100 {
 			t.Fatal("expected proof record for alice")
+		}
+		if !got.Timestamp.Equal(timestamp) {
+			t.Fatalf("expected proof timestamp %v, got %v", timestamp, got.Timestamp)
 		}
 	})
 }
@@ -208,8 +214,9 @@ func TestStorageSetProofReplacesExisting(t *testing.T) {
 
 func TestStorageAddPenalty(t *testing.T) {
 	testStorageImplementations(t, "AddPenalty", func(t *testing.T, storage Storage) {
-		p1 := PenaltyEvent{User: "alice", Amount: 10}
-		p2 := PenaltyEvent{User: "alice", Amount: 20}
+		timestamp := time.Date(2024, time.March, 4, 5, 6, 7, 0, time.UTC)
+		p1 := PenaltyEvent{User: "alice", Amount: 10, Timestamp: timestamp}
+		p2 := PenaltyEvent{User: "alice", Amount: 20, Timestamp: timestamp.Add(2 * time.Minute)}
 
 		if err := storage.AddPenalty(p1); err != nil {
 			t.Fatalf("unexpected error: %v", err)

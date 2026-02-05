@@ -1,6 +1,9 @@
 package main
 
-import "maps"
+import (
+	"maps"
+	"time"
+)
 
 // Use it for reasonably deep tree traversals.
 // We assume that vouch weight reduces 10x per hop, and each user has 10 peers on average.
@@ -12,9 +15,9 @@ const DefaultTreeDepth = 8
 
 // Represents a stored vouch.
 type VouchEvent struct {
-	From string
-	To   string
-	// TODO: Add Timestamp field
+	From      string
+	To        string
+	Timestamp time.Time
 	// TODO: maybe store proof for external verification?
 }
 

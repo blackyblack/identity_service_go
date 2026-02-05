@@ -44,6 +44,14 @@ func TestVouchHandler_Success(t *testing.T) {
 	if resp.Message != "Vouch accepted" {
 		t.Fatalf("Expected message 'Vouch accepted', got '%s'", resp.Message)
 	}
+
+	vouches := appState.UserVouchesFrom("user1")
+	if len(vouches) != 1 {
+		t.Fatalf("expected 1 vouch, got %d", len(vouches))
+	}
+	if vouches[0].Timestamp.IsZero() {
+		t.Fatal("expected vouch timestamp to be set")
+	}
 }
 
 // Tests the vouch endpoint with missing fields
@@ -145,6 +153,9 @@ func TestProveHandler_Success(t *testing.T) {
 	if proof.Balance != 42 {
 		t.Fatalf("expected balance 42, got %d", proof.Balance)
 	}
+	if proof.Timestamp.IsZero() {
+		t.Fatal("expected proof timestamp to be set")
+	}
 }
 
 // Tests the prove endpoint with missing user field
@@ -242,6 +253,14 @@ func TestPunishHandler_Success(t *testing.T) {
 
 	if got := appState.ModerationBalance("user1"); got != 70 {
 		t.Fatalf("expected moderated balance 70, got %d", got)
+	}
+
+	penalties := appState.Penalties("user1")
+	if len(penalties) != 1 {
+		t.Fatalf("expected 1 penalty, got %d", len(penalties))
+	}
+	if penalties[0].Timestamp.IsZero() {
+		t.Fatal("expected penalty timestamp to be set")
 	}
 }
 
