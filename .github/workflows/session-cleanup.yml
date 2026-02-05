@@ -28,8 +28,8 @@ jobs:
           SESSION_BRANCH="session/${{ github.event.pull_request.head.ref }}"
           echo "Attempting to delete session branch: ${SESSION_BRANCH}"
           
-          # Check if session branch exists and delete it
-          if git ls-remote --heads origin "${SESSION_BRANCH}" | grep -q "${SESSION_BRANCH}"; then
+          # Use GitHub API to check if branch exists and delete it
+          if gh api "repos/${{ github.repository }}/branches/${SESSION_BRANCH}" --silent 2>/dev/null; then
             gh api -X DELETE "repos/${{ github.repository }}/git/refs/heads/${SESSION_BRANCH}" || echo "Branch already deleted or doesn't exist"
             echo "Deleted session branch: ${SESSION_BRANCH}"
           else
@@ -47,8 +47,8 @@ jobs:
           SESSION_BRANCH="session/${{ github.event.inputs.branch_name }}"
           echo "Attempting to delete session branch: ${SESSION_BRANCH}"
           
-          # Check if session branch exists and delete it
-          if git ls-remote --heads origin "${SESSION_BRANCH}" | grep -q "${SESSION_BRANCH}"; then
+          # Use GitHub API to check if branch exists and delete it
+          if gh api "repos/${{ github.repository }}/branches/${SESSION_BRANCH}" --silent 2>/dev/null; then
             gh api -X DELETE "repos/${{ github.repository }}/git/refs/heads/${SESSION_BRANCH}" || echo "Branch already deleted or doesn't exist"
             echo "Deleted session branch: ${SESSION_BRANCH}"
           else
