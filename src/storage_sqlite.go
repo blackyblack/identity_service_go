@@ -2,10 +2,13 @@ package main
 
 import (
 	"database/sql"
+	"fmt"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
 )
+
+const timestampDefaultExpression = "(strftime('%s','now'))"
 
 // Implements Storage using SQLite database.
 type SQLiteStorage struct {
@@ -87,15 +90,15 @@ func createTables(db *sql.DB) error {
 	}
 
 	if err := ensureColumn(db, "vouches", "timestamp",
-		"ALTER TABLE vouches ADD COLUMN timestamp INTEGER NOT NULL DEFAULT (strftime('%s','now'))"); err != nil {
+		"ALTER TABLE vouches ADD COLUMN timestamp INTEGER NOT NULL DEFAULT "+timestampDefaultExpression); err != nil {
 		return err
 	}
 	if err := ensureColumn(db, "proofs", "timestamp",
-		"ALTER TABLE proofs ADD COLUMN timestamp INTEGER NOT NULL DEFAULT (strftime('%s','now'))"); err != nil {
+		"ALTER TABLE proofs ADD COLUMN timestamp INTEGER NOT NULL DEFAULT "+timestampDefaultExpression); err != nil {
 		return err
 	}
 	if err := ensureColumn(db, "penalties", "timestamp",
-		"ALTER TABLE penalties ADD COLUMN timestamp INTEGER NOT NULL DEFAULT (strftime('%s','now'))"); err != nil {
+		"ALTER TABLE penalties ADD COLUMN timestamp INTEGER NOT NULL DEFAULT "+timestampDefaultExpression); err != nil {
 		return err
 	}
 
@@ -115,6 +118,9 @@ func ensureColumn(db *sql.DB, tableName string, columnName string, alterStatemen
 }
 
 func columnExists(db *sql.DB, tableName string, columnName string) (bool, error) {
+	if !isAllowedTableName(tableName) {
+		return false, fmt.Errorf("unsupported table name %q", tableName)
+	}
 	rows, err := db.Query("PRAGMA table_info(" + tableName + ")")
 	if err != nil {
 		return false, err
@@ -139,6 +145,15 @@ func columnExists(db *sql.DB, tableName string, columnName string) (bool, error)
 		return false, err
 	}
 	return false, nil
+}
+
+func isAllowedTableName(tableName string) bool {
+	switch tableName {
+	case "vouches", "proofs", "penalties":
+		return true
+	default:
+		return false
+	}
 }
 
 // Returns all users who have vouches, proofs, or penalties recorded.
