@@ -6,7 +6,7 @@ set -euo pipefail
 #
 # If task_branch is omitted, uses the current git branch.
 #
-# Writes session memory to remote branch session/<task_branch>
+# Writes session memory to remote branch copilot/session/<task_branch>
 # Keeps a SINGLE rolling commit (amends each update), so branch history does not grow.
 # session.md MUST NOT be committed to the code branch.
 
@@ -19,7 +19,7 @@ if [[ "$TASK_BRANCH" == "HEAD" ]]; then
   exit 2
 fi
 
-SESSION_BRANCH="session/${TASK_BRANCH}"
+SESSION_BRANCH="copilot/session/${TASK_BRANCH}"
 
 # Check that session file exists
 if [[ ! -f "$SESSION_FILE" ]]; then

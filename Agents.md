@@ -1,6 +1,6 @@
 # Agents.md - Session memory
 
-Session memory is stored as `session.md` on branch `session/<task-branch>`.  
+Session memory is stored as `session.md` on branch `copilot/session/<task-branch>`.  
 **Rule:** `session.md` MUST NOT be committed to the code branch.
 
 ## Workflow
@@ -10,7 +10,7 @@ Session memory is stored as `session.md` on branch `session/<task-branch>`.
 
 `session_pull.sh` seeds `session.md` with a template if no prior memory exists. Fill it in as you work and keep it updated through the session.
 
-Enable git hooks so `session_pull.sh` runs after pulls/merges and `session_push.sh` runs before pushes:
+Enable git hooks so `session_pull.sh` runs after merges (via `post-merge`) and `session_push.sh` runs before pushes:
 `git config core.hooksPath .githooks`
 
 ## What to store in session.md
@@ -25,4 +25,4 @@ Persist all important steps so the task solution flow can be reproduced.
 ## Cleanup
 
 Session branches are deleted automatically when the PR is merged.  
-Manual: `git push origin --delete session/<task-branch>`
+Manual: `git push origin --delete copilot/session/<task-branch>`

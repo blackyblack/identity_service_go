@@ -15,7 +15,7 @@ if [[ "$TASK_BRANCH" == "HEAD" ]]; then
   exit 2
 fi
 
-SESSION_BRANCH="session/${TASK_BRANCH}"
+SESSION_BRANCH="copilot/session/${TASK_BRANCH}"
 
 write_template() {
   cat <<'EOF' > "$SESSION_FILE"
