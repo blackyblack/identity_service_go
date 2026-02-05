@@ -5,11 +5,11 @@ import (
 	"testing"
 )
 
-// storageFactory is a function that creates a new Storage instance
+// Creates a new Storage instance
 type storageFactory func(t *testing.T) Storage
 
-// testStorageImplementations runs the given test function against both
-// in-memory and SQLite storage implementations to ensure identical behavior.
+// Runs the given test function against both in-memory and SQLite
+// storage implementations to ensure identical behavior.
 func testStorageImplementations(t *testing.T, name string, testFn func(t *testing.T, storage Storage)) {
 	factories := map[string]storageFactory{
 		"Memory": func(t *testing.T) Storage {
@@ -46,7 +46,7 @@ func testStorageImplementations(t *testing.T, name string, testFn func(t *testin
 
 func TestStorageEmpty(t *testing.T) {
 	testStorageImplementations(t, "Empty", func(t *testing.T, storage Storage) {
-		vouches, err := storage.Vouches()
+		vouches, err := storage.UserVouchesFrom("alice")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -54,11 +54,11 @@ func TestStorageEmpty(t *testing.T) {
 			t.Fatalf("expected 0 vouches, got %d", len(vouches))
 		}
 
-		_, ok, err := storage.ProofRecord("alice")
+		record, err := storage.ProofRecord("alice")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if ok {
+		if record.User != "alice" || record.Balance != 0 {
 			t.Fatal("expected no proof record for alice")
 		}
 
@@ -84,15 +84,50 @@ func TestStorageAddVouch(t *testing.T) {
 			t.Fatalf("unexpected error adding vouch: %v", err)
 		}
 
-		vouches, err := storage.Vouches()
+		vouches, err := storage.UserVouchesFrom("alice")
 		if err != nil {
 			t.Fatalf("unexpected error getting vouches: %v", err)
 		}
-		if len(vouches) != 2 {
-			t.Fatalf("expected 2 vouches, got %d", len(vouches))
+		if len(vouches) != 1 {
+			t.Fatalf("expected 1 vouch, got %d", len(vouches))
 		}
-		if vouches[0] != v1 || vouches[1] != v2 {
-			t.Fatalf("unexpected vouch order: %#v", vouches)
+		if vouches[0] != v1 {
+			t.Fatalf("unexpected vouch: %#v", vouches)
+		}
+
+		vouches, err = storage.UserVouchesFrom("bob")
+		if err != nil {
+			t.Fatalf("unexpected error getting vouches: %v", err)
+		}
+		if len(vouches) != 1 {
+			t.Fatalf("expected 1 vouch, got %d", len(vouches))
+		}
+		if vouches[0] != v2 {
+			t.Fatalf("unexpected vouch: %#v", vouches)
+		}
+	})
+}
+
+func TestStorageAddVouchReplaces(t *testing.T) {
+	testStorageImplementations(t, "AddVouchReplaces", func(t *testing.T, storage Storage) {
+		vouch := VouchEvent{From: "alice", To: "bob"}
+
+		if err := storage.AddVouch(vouch); err != nil {
+			t.Fatalf("unexpected error adding vouch: %v", err)
+		}
+		if err := storage.AddVouch(vouch); err != nil {
+			t.Fatalf("unexpected error adding vouch: %v", err)
+		}
+
+		vouches, err := storage.UserVouchesFrom("alice")
+		if err != nil {
+			t.Fatalf("unexpected error getting vouches: %v", err)
+		}
+		if len(vouches) != 1 {
+			t.Fatalf("expected 1 vouch, got %d", len(vouches))
+		}
+		if vouches[0] != vouch {
+			t.Fatalf("unexpected vouch: %#v", vouches)
 		}
 	})
 }
@@ -109,7 +144,7 @@ func TestStorageVouchesReturnsCopy(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 
-		vouches, err := storage.Vouches()
+		vouches, err := storage.UserVouchesFrom("alice")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -119,14 +154,14 @@ func TestStorageVouchesReturnsCopy(t *testing.T) {
 		vouches = append(vouches, VouchEvent{From: "dan", To: "erin"})
 
 		// Verify storage is unchanged
-		vouchesAfter, err := storage.Vouches()
+		vouchesAfter, err := storage.UserVouchesFrom("alice")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if len(vouchesAfter) != 2 {
-			t.Fatalf("expected 2 vouches after mutation, got %d", len(vouchesAfter))
+		if len(vouchesAfter) != 1 {
+			t.Fatalf("expected 1 vouch after mutation, got %d", len(vouchesAfter))
 		}
-		if vouchesAfter[0] != v1 || vouchesAfter[1] != v2 {
+		if vouchesAfter[0] != v1 {
 			t.Fatalf("storage mutated through copy: %#v", vouchesAfter)
 		}
 	})
@@ -139,15 +174,12 @@ func TestStorageSetProof(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 
-		got, ok, err := storage.ProofRecord("alice")
+		got, err := storage.ProofRecord("alice")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if !ok {
-			t.Fatal("expected proof record for alice")
-		}
 		if got.User != "alice" || got.Balance != 100 {
-			t.Fatalf("unexpected proof: %#v", got)
+			t.Fatal("expected proof record for alice")
 		}
 	})
 }
@@ -161,11 +193,11 @@ func TestStorageSetProofReplacesExisting(t *testing.T) {
 			t.Fatalf("unexpected error: %v", err)
 		}
 
-		proof, ok, err := storage.ProofRecord("alice")
+		proof, err := storage.ProofRecord("alice")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if !ok {
+		if proof.User != "alice" {
 			t.Fatal("expected proof record for alice")
 		}
 		if proof.Balance != 25 {
@@ -303,36 +335,36 @@ func TestStorageMultipleUsers(t *testing.T) {
 		}
 
 		// Verify vouches
-		vouches, err := storage.Vouches()
+		vouches, err := storage.UserVouchesFrom("alice")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if len(vouches) != 2 {
-			t.Fatalf("expected 2 vouches, got %d", len(vouches))
+		if len(vouches) != 1 {
+			t.Fatalf("expected 1 vouch, got %d", len(vouches))
 		}
 
 		// Verify proofs
-		aliceProof, ok, err := storage.ProofRecord("alice")
+		aliceProof, err := storage.ProofRecord("alice")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if !ok || aliceProof.Balance != 100 {
+		if aliceProof.User != "alice" || aliceProof.Balance != 100 {
 			t.Fatalf("unexpected alice proof: %#v", aliceProof)
 		}
 
-		bobProof, ok, err := storage.ProofRecord("bob")
+		bobProof, err := storage.ProofRecord("bob")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if !ok || bobProof.Balance != 200 {
+		if bobProof.User != "bob" || bobProof.Balance != 200 {
 			t.Fatalf("unexpected bob proof: %#v", bobProof)
 		}
 
-		_, ok, err = storage.ProofRecord("carol")
+		carolProof, err := storage.ProofRecord("carol")
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if ok {
+		if carolProof.User != "carol" || carolProof.Balance != 0 {
 			t.Fatal("expected no proof record for carol")
 		}
 
@@ -369,7 +401,7 @@ func TestStorageClose(t *testing.T) {
 	})
 }
 
-// TestSQLiteStoragePersistence verifies that SQLite data persists across connections.
+// Verifies that SQLite data persists across connections.
 func TestSQLiteStoragePersistence(t *testing.T) {
 	tmpFile, err := os.CreateTemp("", "test_persistence_*.db")
 	if err != nil {
@@ -404,7 +436,7 @@ func TestSQLiteStoragePersistence(t *testing.T) {
 	defer storage2.Close()
 
 	// Verify data persisted
-	vouches, err := storage2.Vouches()
+	vouches, err := storage2.UserVouchesFrom("alice")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -412,11 +444,11 @@ func TestSQLiteStoragePersistence(t *testing.T) {
 		t.Fatalf("vouches did not persist: %#v", vouches)
 	}
 
-	proof, ok, err := storage2.ProofRecord("alice")
+	proof, err := storage2.ProofRecord("alice")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !ok || proof.Balance != 100 {
+	if proof.User != "alice" || proof.Balance != 100 {
 		t.Fatalf("proof did not persist: %#v", proof)
 	}
 
@@ -429,7 +461,7 @@ func TestSQLiteStoragePersistence(t *testing.T) {
 	}
 }
 
-// TestAppStateWithSQLiteStorage verifies that AppState works correctly with SQLite storage.
+// Verifies that AppState works correctly with SQLite storage.
 func TestAppStateWithSQLiteStorage(t *testing.T) {
 	tmpFile, err := os.CreateTemp("", "test_appstate_*.db")
 	if err != nil {
@@ -450,14 +482,14 @@ func TestAppStateWithSQLiteStorage(t *testing.T) {
 	state.AddVouch(VouchEvent{From: "alice", To: "bob"})
 	state.AddVouch(VouchEvent{From: "bob", To: "carol"})
 
-	vouches := state.Vouches()
-	if len(vouches) != 2 {
-		t.Fatalf("expected 2 vouches, got %d", len(vouches))
+	vouches := state.UserVouchesFrom("alice")
+	if len(vouches) != 1 {
+		t.Fatalf("expected 1 vouch, got %d", len(vouches))
 	}
 
 	state.SetProof(ProofEvent{User: "alice", Balance: 100})
-	proof, ok := state.ProofRecord("alice")
-	if !ok || proof.Balance != 100 {
+	proof, err := state.ProofRecord("alice")
+	if err != nil || proof.Balance != 100 {
 		t.Fatalf("unexpected proof: %#v", proof)
 	}
 
@@ -473,7 +505,7 @@ func TestAppStateWithSQLiteStorage(t *testing.T) {
 	}
 }
 
-// TestAppStateWithBothStorages verifies that AppState behaves identically with both storage types.
+// Verifies that AppState behaves identically with both storage types.
 func TestAppStateWithBothStorages(t *testing.T) {
 	// Test with memory storage
 	memState := NewAppState()
@@ -505,37 +537,40 @@ func TestAppStateWithBothStorages(t *testing.T) {
 	}
 
 	// Verify both states have identical results
-	memVouches := memState.Vouches()
-	sqliteVouches := sqliteState.Vouches()
-	if len(memVouches) != len(sqliteVouches) {
-		t.Fatalf("vouch count mismatch: memory=%d, sqlite=%d", len(memVouches), len(sqliteVouches))
-	}
-	for i := range memVouches {
-		if memVouches[i] != sqliteVouches[i] {
-			t.Fatalf("vouch mismatch at index %d: memory=%#v, sqlite=%#v", i, memVouches[i], sqliteVouches[i])
+	users := []string{"alice", "bob", "carol"}
+	for _, user := range users {
+		memVouches := memState.UserVouchesFrom(user)
+		sqliteVouches := sqliteState.UserVouchesFrom(user)
+		if len(memVouches) != len(sqliteVouches) {
+			t.Fatalf("vouch count mismatch: memory=%d, sqlite=%d", len(memVouches), len(sqliteVouches))
 		}
-	}
-
-	memProof, memOk := memState.ProofRecord("alice")
-	sqliteProof, sqliteOk := sqliteState.ProofRecord("alice")
-	if memOk != sqliteOk || memProof != sqliteProof {
-		t.Fatalf("proof mismatch: memory=%#v/%v, sqlite=%#v/%v", memProof, memOk, sqliteProof, sqliteOk)
-	}
-
-	memPenalties := memState.Penalties("alice")
-	sqlitePenalties := sqliteState.Penalties("alice")
-	if len(memPenalties) != len(sqlitePenalties) {
-		t.Fatalf("penalty count mismatch: memory=%d, sqlite=%d", len(memPenalties), len(sqlitePenalties))
-	}
-	for i := range memPenalties {
-		if memPenalties[i] != sqlitePenalties[i] {
-			t.Fatalf("penalty mismatch at index %d: memory=%#v, sqlite=%#v", i, memPenalties[i], sqlitePenalties[i])
+		for i := range memVouches {
+			if memVouches[i] != sqliteVouches[i] {
+				t.Fatalf("vouch mismatch at index %d: memory=%#v, sqlite=%#v", i, memVouches[i], sqliteVouches[i])
+			}
 		}
-	}
 
-	memBalance := memState.ModerationBalance("alice")
-	sqliteBalance := sqliteState.ModerationBalance("alice")
-	if memBalance != sqliteBalance {
-		t.Fatalf("balance mismatch: memory=%d, sqlite=%d", memBalance, sqliteBalance)
+		memProof, memErr := memState.ProofRecord(user)
+		sqliteProof, sqliteErr := sqliteState.ProofRecord(user)
+		if memErr != sqliteErr || memProof != sqliteProof {
+			t.Fatalf("proof mismatch: memory=%#v/%v, sqlite=%#v/%v", memProof, memErr, sqliteProof, sqliteErr)
+		}
+
+		memPenalties := memState.Penalties(user)
+		sqlitePenalties := sqliteState.Penalties(user)
+		if len(memPenalties) != len(sqlitePenalties) {
+			t.Fatalf("penalty count mismatch: memory=%d, sqlite=%d", len(memPenalties), len(sqlitePenalties))
+		}
+		for i := range memPenalties {
+			if memPenalties[i] != sqlitePenalties[i] {
+				t.Fatalf("penalty mismatch at index %d: memory=%#v, sqlite=%#v", i, memPenalties[i], sqlitePenalties[i])
+			}
+		}
+
+		memBalance := memState.ModerationBalance(user)
+		sqliteBalance := sqliteState.ModerationBalance(user)
+		if memBalance != sqliteBalance {
+			t.Fatalf("balance mismatch: memory=%d, sqlite=%d", memBalance, sqliteBalance)
+		}
 	}
 }

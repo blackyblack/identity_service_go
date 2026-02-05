@@ -1,42 +1,93 @@
 package main
 
-import "sync"
+import (
+	"sync"
+)
 
-// MemoryStorage implements Storage using in-memory data structures.
+// Implements Storage using in-memory data structures.
 type MemoryStorage struct {
-	mu        sync.RWMutex
-	vouches   []VouchEvent
+	mu sync.RWMutex
+	// maps user to vouched users
+	vouchesFrom map[string]map[string]VouchEvent
+	// maps user to users who vouched for them
+	vouchesTo map[string]map[string]VouchEvent
 	proofs    map[string]ProofEvent
 	penalties map[string][]PenaltyEvent
 }
 
-// NewMemoryStorage initializes an empty in-memory storage.
+// Initializes an empty in-memory storage.
 func NewMemoryStorage() *MemoryStorage {
 	return &MemoryStorage{
-		vouches:   make([]VouchEvent, 0),
-		proofs:    make(map[string]ProofEvent),
-		penalties: make(map[string][]PenaltyEvent),
+		vouchesFrom: make(map[string]map[string]VouchEvent),
+		vouchesTo:   make(map[string]map[string]VouchEvent),
+		proofs:      make(map[string]ProofEvent),
+		penalties:   make(map[string][]PenaltyEvent),
 	}
 }
 
-// AddVouch records an incoming vouch event.
+// Returns all users who have vouches, proofs, or penalties recorded.
+func (s *MemoryStorage) Users() ([]string, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	userSet := make(map[string]struct{})
+	for from := range s.vouchesFrom {
+		userSet[from] = struct{}{}
+		for to := range s.vouchesFrom[from] {
+			userSet[to] = struct{}{}
+		}
+	}
+	for user := range s.proofs {
+		userSet[user] = struct{}{}
+	}
+	for user := range s.penalties {
+		userSet[user] = struct{}{}
+	}
+	users := make([]string, 0, len(userSet))
+	for user := range userSet {
+		users = append(users, user)
+	}
+	return users, nil
+}
+
+// Records an incoming vouch event.
 func (s *MemoryStorage) AddVouch(vouch VouchEvent) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.vouches = append(s.vouches, vouch)
+	if s.vouchesFrom[vouch.From] == nil {
+		s.vouchesFrom[vouch.From] = make(map[string]VouchEvent)
+	}
+	s.vouchesFrom[vouch.From][vouch.To] = vouch
+	// Also update the reverse mapping
+	if s.vouchesTo[vouch.To] == nil {
+		s.vouchesTo[vouch.To] = make(map[string]VouchEvent)
+	}
+	s.vouchesTo[vouch.To][vouch.From] = vouch
 	return nil
 }
 
-// Vouches returns a copy of all stored vouches.
-func (s *MemoryStorage) Vouches() ([]VouchEvent, error) {
+// Returns a copy of all stored outgoing vouches for a specific user.
+func (s *MemoryStorage) UserVouchesFrom(user string) ([]VouchEvent, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	vouchesCopy := make([]VouchEvent, len(s.vouches))
-	copy(vouchesCopy, s.vouches)
+	vouchesCopy := make([]VouchEvent, 0, len(s.vouchesFrom[user]))
+	for _, vouch := range s.vouchesFrom[user] {
+		vouchesCopy = append(vouchesCopy, vouch)
+	}
 	return vouchesCopy, nil
 }
 
-// SetProof stores the latest proof event for a user, replacing any prior record.
+// Returns a copy of all stored incoming vouches for a specific user.
+func (s *MemoryStorage) UserVouchesTo(user string) ([]VouchEvent, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	vouchesCopy := make([]VouchEvent, 0, len(s.vouchesTo[user]))
+	for _, vouch := range s.vouchesTo[user] {
+		vouchesCopy = append(vouchesCopy, vouch)
+	}
+	return vouchesCopy, nil
+}
+
+// Stores the latest proof event for a user, replacing any prior record.
 func (s *MemoryStorage) SetProof(proof ProofEvent) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -44,15 +95,19 @@ func (s *MemoryStorage) SetProof(proof ProofEvent) error {
 	return nil
 }
 
-// ProofRecord returns the stored proof event for a user, if any.
-func (s *MemoryStorage) ProofRecord(user string) (ProofEvent, bool, error) {
+// Returns the stored proof event for a user, if any.
+func (s *MemoryStorage) ProofRecord(user string) (ProofEvent, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	proof, ok := s.proofs[user]
-	return proof, ok, nil
+	// Defaults to zero balance if no proof exists.
+	if !ok {
+		proof = ProofEvent{User: user}
+	}
+	return proof, nil
 }
 
-// AddPenalty records a penalty event.
+// Records a penalty event.
 func (s *MemoryStorage) AddPenalty(penalty PenaltyEvent) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -60,7 +115,7 @@ func (s *MemoryStorage) AddPenalty(penalty PenaltyEvent) error {
 	return nil
 }
 
-// Penalties returns a copy of all stored penalties for a user.
+// Returns a copy of all stored penalties for a user.
 func (s *MemoryStorage) Penalties(user string) ([]PenaltyEvent, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

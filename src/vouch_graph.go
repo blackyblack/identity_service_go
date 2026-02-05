@@ -10,44 +10,29 @@ import "maps"
 // NOTE: penalties are not limited with 100 IDT, so one may consider another depth for penalty calculations.
 const DefaultTreeDepth = 8
 
-// VouchGraphEdge represents a vouch event between two users.
-type VouchGraphEdge struct {
-	Event VouchEvent
-	Peer  *VouchGraphNode
+// Represents a stored vouch.
+type VouchEvent struct {
+	From string
+	To   string
+	// TODO: Add Timestamp field
+	// TODO: maybe store proof for external verification?
 }
 
-// VouchGraphNode represents a user in the vouch graph.
-type VouchGraphNode struct {
-	User     string
-	Outgoing []VouchGraphEdge
-	Incoming []VouchGraphEdge
-}
-
-// VouchGraph organizes users and their vouch relationships.
-type VouchGraph struct {
-	Nodes map[string]*VouchGraphNode
-}
-
-// VouchTreeEdge represents a vouch event in the vouch tree.
+// Represents a vouch event in the vouch tree.
 type VouchTreeEdge struct {
 	Event VouchEvent
 	Peer  *VouchTreeNode
 }
 
-// VouchTreeNode represents a user in the vouch tree (unidirectional).
+// Represents a user in the vouch tree (unidirectional).
 type VouchTreeNode struct {
 	User  string
 	Depth int
 	Peers []VouchTreeEdge
 }
 
-func NewVouchGraphNode(user string) VouchGraphNode {
-	return VouchGraphNode{
-		User:     user,
-		Outgoing: []VouchGraphEdge{},
-		Incoming: []VouchGraphEdge{},
-	}
-}
+// Defines the type for the processing function used in tree traversal.
+type ProcessFunc[T any] func(node *VouchTreeNode, results map[*VouchTreeNode]T) T
 
 func NewVouchTreeNode(user string, depth int) VouchTreeNode {
 	return VouchTreeNode{
@@ -57,45 +42,9 @@ func NewVouchTreeNode(user string, depth int) VouchTreeNode {
 	}
 }
 
-// BuildVouchGraph constructs a graph where users are nodes and vouches are edges.
-func BuildVouchGraph(vouches []VouchEvent) VouchGraph {
-	nodes := make(map[string]*VouchGraphNode)
-
-	getNode := func(user string) *VouchGraphNode {
-		if node, ok := nodes[user]; ok {
-			return node
-		}
-		node := NewVouchGraphNode(user)
-		nodes[user] = &node
-		return &node
-	}
-
-	for _, vouch := range vouches {
-		fromNode := getNode(vouch.From)
-		toNode := getNode(vouch.To)
-
-		// Create edge
-		outEdge := VouchGraphEdge{
-			Event: vouch,
-			Peer:  toNode,
-		}
-		inEdge := VouchGraphEdge{
-			Event: vouch,
-			Peer:  fromNode,
-		}
-
-		fromNode.Outgoing = append(fromNode.Outgoing, outEdge)
-		toNode.Incoming = append(toNode.Incoming, inEdge)
-	}
-
-	return VouchGraph{
-		Nodes: nodes,
-	}
-}
-
-// buildTree is a helper function to build a depth-limited tree in a specified direction.
+// Builds a depth-limited tree in a specified direction.
 // If depth is negative, the search is unlimited.
-func (g VouchGraph) buildTree(user string, depth int, isOutgoing bool) *VouchTreeNode {
+func buildTree(state *AppState, user string, depth int, isOutgoing bool) *VouchTreeNode {
 	if depth == 0 {
 		return &VouchTreeNode{User: user, Depth: 0, Peers: []VouchTreeEdge{}}
 	}
@@ -122,23 +71,18 @@ func (g VouchGraph) buildTree(user string, depth int, isOutgoing bool) *VouchTre
 			continue
 		}
 
-		graphNode, exists := g.Nodes[curr.node.User]
-		if !exists {
-			continue
-		}
-		if graphNode == nil {
-			continue
-		}
+		var events []VouchEvent
 
-		edges := graphNode.Incoming
 		if isOutgoing {
-			edges = graphNode.Outgoing
+			events = state.UserVouchesFrom(curr.node.User)
+		} else {
+			events = state.UserVouchesTo(curr.node.User)
 		}
 
-		for _, edge := range edges {
-			peerUser := edge.Event.From
+		for _, event := range events {
+			peerUser := event.From
 			if isOutgoing {
-				peerUser = edge.Event.To
+				peerUser = event.To
 			}
 
 			if curr.path[peerUser] {
@@ -151,7 +95,7 @@ func (g VouchGraph) buildTree(user string, depth int, isOutgoing bool) *VouchTre
 
 			// Link it to the current tree node
 			curr.node.Peers = append(curr.node.Peers, VouchTreeEdge{
-				Event: edge.Event,
+				Event: event,
 				Peer:  &peerTreeNode,
 			})
 
@@ -170,12 +114,54 @@ func (g VouchGraph) buildTree(user string, depth int, isOutgoing bool) *VouchTre
 	return &root
 }
 
-// OutgoingTree builds a depth-limited outgoing vouch tree rooted at the user iteratively.
-func (g VouchGraph) OutgoingTree(user string, depth int) *VouchTreeNode {
-	return g.buildTree(user, depth, true)
+// Builds a depth-limited outgoing vouch tree rooted at the user iteratively.
+func OutgoingTree(state *AppState, user string, depth int) *VouchTreeNode {
+	return buildTree(state, user, depth, true)
 }
 
-// IncomingTree builds a depth-limited incoming vouch tree rooted at the user iteratively.
-func (g VouchGraph) IncomingTree(user string, depth int) *VouchTreeNode {
-	return g.buildTree(user, depth, false)
+// Builds a depth-limited incoming vouch tree rooted at the user iteratively.
+func IncomingTree(state *AppState, user string, depth int) *VouchTreeNode {
+	return buildTree(state, user, depth, false)
+}
+
+// Traverses the vouch tree in post-order and applies the process function to each node.
+// It returns a map of nodes to their computed values.
+func WalkTreePostOrder[T any](root *VouchTreeNode, process ProcessFunc[T]) map[*VouchTreeNode]T {
+	results := make(map[*VouchTreeNode]T)
+	if root == nil {
+		return results
+	}
+
+	type stackItem struct {
+		node    *VouchTreeNode
+		visited bool
+	}
+
+	stack := []stackItem{{node: root, visited: false}}
+
+	for len(stack) > 0 {
+		item := stack[len(stack)-1]
+		stack = stack[:len(stack)-1]
+
+		if item.node == nil {
+			continue
+		}
+
+		if item.visited {
+			results[item.node] = process(item.node, results)
+			continue
+		}
+
+		stack = append(stack, stackItem{node: item.node, visited: true})
+		// NOTE: Traversal order here does not matter
+		for i := range item.node.Peers {
+			peer := item.node.Peers[i].Peer
+			if peer == nil {
+				continue
+			}
+			stack = append(stack, stackItem{node: peer, visited: false})
+		}
+	}
+
+	return results
 }

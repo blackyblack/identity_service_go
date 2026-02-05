@@ -1,26 +1,32 @@
 package main
 
-// Storage defines the interface for storing vouches, proofs, and penalties.
+// Defines the interface for storing vouches, proofs, and penalties.
 // Both in-memory and persistent implementations should satisfy this interface.
 type Storage interface {
-	// AddVouch records an incoming vouch event.
+	// Records an incoming vouch event.
 	AddVouch(vouch VouchEvent) error
 
-	// Vouches returns all stored vouches.
-	Vouches() ([]VouchEvent, error)
+	// Returns all users who have vouches, proofs, or penalties recorded.
+	Users() ([]string, error)
 
-	// SetProof stores the latest proof event for a user, replacing any prior record.
+	// Returns all stored outgoing vouches for a specific user.
+	UserVouchesFrom(user string) ([]VouchEvent, error)
+
+	// Returns all stored incoming vouches for a specific user.
+	UserVouchesTo(user string) ([]VouchEvent, error)
+
+	// Stores the latest proof event for a user, replacing any prior record.
 	SetProof(proof ProofEvent) error
 
-	// ProofRecord returns the stored proof event for a user, if any.
-	ProofRecord(user string) (ProofEvent, bool, error)
+	// Returns the stored proof event for a user, if any.
+	ProofRecord(user string) (ProofEvent, error)
 
-	// AddPenalty records a penalty event.
+	// Records a penalty event.
 	AddPenalty(penalty PenaltyEvent) error
 
-	// Penalties returns all penalties for a user.
+	// Returns all penalties for a user.
 	Penalties(user string) ([]PenaltyEvent, error)
 
-	// Close releases any resources used by the storage.
+	// Releases any resources used by the storage.
 	Close() error
 }

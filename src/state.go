@@ -2,72 +2,84 @@ package main
 
 import "log"
 
-// AppState wraps a Storage implementation to provide application-level operations.
+// Wraps a Storage implementation to provide application-level operations.
 type AppState struct {
 	storage Storage
 }
 
-// NewAppState initializes an application state with in-memory storage.
+// Initializes an application state with in-memory storage.
 func NewAppState() *AppState {
 	return &AppState{
 		storage: NewMemoryStorage(),
 	}
 }
 
-// NewAppStateWithStorage initializes an application state with a specific storage implementation.
+// Initializes an application state with a specific storage implementation.
 func NewAppStateWithStorage(storage Storage) *AppState {
 	return &AppState{
 		storage: storage,
 	}
 }
 
-// AddVouch records an incoming vouch event.
+// Returns all users.
+func (s *AppState) Users() []string {
+	users, err := s.storage.Users()
+	if err != nil {
+		log.Printf("Error getting users: %v", err)
+		return []string{}
+	}
+	return users
+}
+
+// Records an incoming vouch event.
 func (s *AppState) AddVouch(vouch VouchEvent) {
 	if err := s.storage.AddVouch(vouch); err != nil {
 		log.Printf("Error adding vouch: %v", err)
 	}
 }
 
-// Vouches returns all stored vouches.
-func (s *AppState) Vouches() []VouchEvent {
-	vouches, err := s.storage.Vouches()
+func (s *AppState) UserVouchesFrom(user string) []VouchEvent {
+	vouches, err := s.storage.UserVouchesFrom(user)
 	if err != nil {
-		log.Printf("Error getting vouches: %v", err)
+		log.Printf("Error getting vouches from user %s: %v", user, err)
 		return []VouchEvent{}
 	}
 	return vouches
 }
 
-// VouchGraph builds a vouch graph from the stored vouches.
-func (s *AppState) VouchGraph() VouchGraph {
-	return BuildVouchGraph(s.Vouches())
+func (s *AppState) UserVouchesTo(user string) []VouchEvent {
+	vouches, err := s.storage.UserVouchesTo(user)
+	if err != nil {
+		log.Printf("Error getting vouches to user %s: %v", user, err)
+		return []VouchEvent{}
+	}
+	return vouches
 }
 
-// SetProof stores the latest proof event for a user, replacing any prior record.
+// Stores the latest proof event for a user, replacing any prior record.
 func (s *AppState) SetProof(proof ProofEvent) {
 	if err := s.storage.SetProof(proof); err != nil {
 		log.Printf("Error setting proof: %v", err)
 	}
 }
 
-// ProofRecord returns the stored proof event for a user, if any.
-func (s *AppState) ProofRecord(user string) (ProofEvent, bool) {
-	proof, ok, err := s.storage.ProofRecord(user)
+// Returns the stored proof event for a user, if any.
+func (s *AppState) ProofRecord(user string) (ProofEvent, error) {
+	proof, err := s.storage.ProofRecord(user)
 	if err != nil {
-		log.Printf("Error getting proof record: %v", err)
-		return ProofEvent{}, false
+		return ProofEvent{}, err
 	}
-	return proof, ok
+	return proof, nil
 }
 
-// AddPenalty records a penalty event.
+// Records a penalty event.
 func (s *AppState) AddPenalty(penalty PenaltyEvent) {
 	if err := s.storage.AddPenalty(penalty); err != nil {
 		log.Printf("Error adding penalty: %v", err)
 	}
 }
 
-// Penalties returns all stored penalties for a user.
+// Returns all stored penalties for a user.
 func (s *AppState) Penalties(user string) []PenaltyEvent {
 	penalties, err := s.storage.Penalties(user)
 	if err != nil {
@@ -77,14 +89,15 @@ func (s *AppState) Penalties(user string) []PenaltyEvent {
 	return penalties
 }
 
-// ModerationBalance computes a user's balance as the proof balance minus penalties.
+// Computes a user's balance as the proof balance minus penalties.
 // If no proof record exists, the base balance is 0.
 func (s *AppState) ModerationBalance(user string) int64 {
-	base := int64(0)
-	if proof, ok := s.ProofRecord(user); ok {
-		base = int64(proof.Balance)
+	proof, err := s.ProofRecord(user)
+	if err != nil {
+		log.Printf("Error getting proof record for user %s: %v", user, err)
+		return 0
 	}
-
+	base := int64(proof.Balance)
 	penaltySum := int64(0)
 	// TODO: add penalty decay based on timestamp
 	for _, penalty := range s.Penalties(user) {
@@ -94,7 +107,7 @@ func (s *AppState) ModerationBalance(user string) int64 {
 	return base - penaltySum
 }
 
-// Close releases any resources used by the storage.
+// Releases any resources used by the storage.
 func (s *AppState) Close() error {
 	return s.storage.Close()
 }
