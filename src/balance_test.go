@@ -1,19 +1,24 @@
 package main
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 func TestPenaltyBuildsOutgoingTree(t *testing.T) {
 	state := NewAppState()
+	timestamp := time.Date(2024, time.January, 2, 3, 4, 5, 0, time.UTC)
+	state.now = func() time.Time { return timestamp }
 
-	v1 := VouchEvent{From: "alice", To: "bob"}
-	v2 := VouchEvent{From: "bob", To: "carol"}
+	v1 := VouchEvent{From: "alice", To: "bob", Timestamp: timestamp}
+	v2 := VouchEvent{From: "bob", To: "carol", Timestamp: timestamp}
 
 	state.AddVouch(v1)
 	state.AddVouch(v2)
 
-	state.AddPenalty(PenaltyEvent{User: "alice", Amount: 5})
-	state.AddPenalty(PenaltyEvent{User: "bob", Amount: 100})
-	state.AddPenalty(PenaltyEvent{User: "carol", Amount: 1000})
+	state.AddPenalty(PenaltyEvent{User: "alice", Amount: 5, Timestamp: timestamp})
+	state.AddPenalty(PenaltyEvent{User: "bob", Amount: 100, Timestamp: timestamp})
+	state.AddPenalty(PenaltyEvent{User: "carol", Amount: 1000, Timestamp: timestamp})
 
 	got := Penalty(state, "alice", nil)
 	if got != 25 {
@@ -23,16 +28,18 @@ func TestPenaltyBuildsOutgoingTree(t *testing.T) {
 
 func TestPenaltyUsesProvidedTree(t *testing.T) {
 	state := NewAppState()
+	timestamp := time.Date(2024, time.January, 2, 3, 4, 5, 0, time.UTC)
+	state.now = func() time.Time { return timestamp }
 
-	v1 := VouchEvent{From: "alice", To: "bob"}
-	v2 := VouchEvent{From: "bob", To: "carol"}
+	v1 := VouchEvent{From: "alice", To: "bob", Timestamp: timestamp}
+	v2 := VouchEvent{From: "bob", To: "carol", Timestamp: timestamp}
 
 	state.AddVouch(v1)
 	state.AddVouch(v2)
 
-	state.AddPenalty(PenaltyEvent{User: "alice", Amount: 5})
-	state.AddPenalty(PenaltyEvent{User: "bob", Amount: 100})
-	state.AddPenalty(PenaltyEvent{User: "carol", Amount: 1000})
+	state.AddPenalty(PenaltyEvent{User: "alice", Amount: 5, Timestamp: timestamp})
+	state.AddPenalty(PenaltyEvent{User: "bob", Amount: 100, Timestamp: timestamp})
+	state.AddPenalty(PenaltyEvent{User: "carol", Amount: 1000, Timestamp: timestamp})
 
 	tree := OutgoingTree(state, "alice", 1)
 
@@ -50,8 +57,11 @@ func TestPenaltyUsesProvidedTree(t *testing.T) {
 
 func TestPenaltySumsUserPenalties(t *testing.T) {
 	state := NewAppState()
-	state.AddPenalty(PenaltyEvent{User: "alice", Amount: 10})
-	state.AddPenalty(PenaltyEvent{User: "alice", Amount: 7})
+	timestamp := time.Date(2024, time.January, 2, 3, 4, 5, 0, time.UTC)
+	state.now = func() time.Time { return timestamp }
+
+	state.AddPenalty(PenaltyEvent{User: "alice", Amount: 10, Timestamp: timestamp})
+	state.AddPenalty(PenaltyEvent{User: "alice", Amount: 7, Timestamp: timestamp.Add(1 * time.Hour)})
 
 	got := Penalty(state, "alice", nil)
 	if got != 17 {
@@ -61,9 +71,12 @@ func TestPenaltySumsUserPenalties(t *testing.T) {
 
 func TestPenaltyUserNotInGraphUsesDirectPenalties(t *testing.T) {
 	state := NewAppState()
-	state.AddVouch(VouchEvent{From: "alice", To: "bob"})
-	state.AddPenalty(PenaltyEvent{User: "mallory", Amount: 12})
-	state.AddPenalty(PenaltyEvent{User: "alice", Amount: 50})
+	timestamp := time.Date(2024, time.January, 2, 3, 4, 5, 0, time.UTC)
+	state.now = func() time.Time { return timestamp }
+
+	state.AddVouch(VouchEvent{From: "alice", To: "bob", Timestamp: timestamp})
+	state.AddPenalty(PenaltyEvent{User: "mallory", Amount: 12, Timestamp: timestamp})
+	state.AddPenalty(PenaltyEvent{User: "alice", Amount: 50, Timestamp: timestamp})
 
 	tree := OutgoingTree(state, "mallory", DefaultTreeDepth)
 	if got := len(tree.Peers); got != 0 {
@@ -87,11 +100,13 @@ func TestPenaltyEmptyStateNoPenalties(t *testing.T) {
 
 func TestPenaltyInheritsFromVouchedUsers(t *testing.T) {
 	state := NewAppState()
-	state.AddVouch(VouchEvent{From: "alice", To: "bob"})
-	state.AddVouch(VouchEvent{From: "alice", To: "carol"})
-	state.AddPenalty(PenaltyEvent{User: "bob", Amount: 50})
-	state.AddPenalty(PenaltyEvent{User: "carol", Amount: 70})
+	timestamp := time.Date(2024, time.January, 2, 3, 4, 5, 0, time.UTC)
+	state.now = func() time.Time { return timestamp }
 
+	state.AddVouch(VouchEvent{From: "alice", To: "bob", Timestamp: timestamp})
+	state.AddVouch(VouchEvent{From: "alice", To: "carol", Timestamp: timestamp})
+	state.AddPenalty(PenaltyEvent{User: "bob", Amount: 50, Timestamp: timestamp})
+	state.AddPenalty(PenaltyEvent{User: "carol", Amount: 70, Timestamp: timestamp})
 	got := Penalty(state, "alice", nil)
 	if got != 12 {
 		t.Fatalf("expected penalty 12, got %d", got)
@@ -109,11 +124,13 @@ func TestBalanceEmptyStateNoProof(t *testing.T) {
 
 func TestBalanceUserNotInGraphUsesDirectPenalties(t *testing.T) {
 	state := NewAppState()
-	state.AddVouch(VouchEvent{From: "alice", To: "bob"})
-	state.SetProof(ProofEvent{User: "mallory", Balance: 40})
-	state.AddPenalty(PenaltyEvent{User: "mallory", Amount: 12})
-	state.AddPenalty(PenaltyEvent{User: "alice", Amount: 50})
+	timestamp := time.Date(2024, time.January, 2, 3, 4, 5, 0, time.UTC)
+	state.now = func() time.Time { return timestamp }
 
+	state.AddVouch(VouchEvent{From: "alice", To: "bob", Timestamp: timestamp})
+	state.SetProof(ProofEvent{User: "mallory", Balance: 40, Timestamp: timestamp})
+	state.AddPenalty(PenaltyEvent{User: "mallory", Amount: 12, Timestamp: timestamp})
+	state.AddPenalty(PenaltyEvent{User: "alice", Amount: 50, Timestamp: timestamp})
 	tree := IncomingTree(state, "mallory", DefaultTreeDepth)
 	if got := len(tree.Peers); got != 0 {
 		t.Fatalf("expected no incoming peers for mallory, got %d", got)
@@ -127,10 +144,12 @@ func TestBalanceUserNotInGraphUsesDirectPenalties(t *testing.T) {
 
 func TestBalanceNegativeWhenPenaltiesExceedProof(t *testing.T) {
 	state := NewAppState()
-	state.AddVouch(VouchEvent{From: "bob", To: "alice"})
+	timestamp := time.Date(2024, time.January, 2, 3, 4, 5, 0, time.UTC)
+	state.now = func() time.Time { return timestamp }
 
-	state.SetProof(ProofEvent{User: "bob", Balance: 10})
-	state.AddPenalty(PenaltyEvent{User: "bob", Amount: 50})
+	state.AddVouch(VouchEvent{From: "bob", To: "alice", Timestamp: timestamp})
+	state.SetProof(ProofEvent{User: "bob", Balance: 10, Timestamp: timestamp})
+	state.AddPenalty(PenaltyEvent{User: "bob", Amount: 50, Timestamp: timestamp})
 
 	got := Balance(state, "bob", nil)
 	if got != -40 {
@@ -140,13 +159,15 @@ func TestBalanceNegativeWhenPenaltiesExceedProof(t *testing.T) {
 
 func TestBalanceBuildsIncomingTree(t *testing.T) {
 	state := NewAppState()
+	timestamp := time.Date(2024, time.January, 2, 3, 4, 5, 0, time.UTC)
+	state.now = func() time.Time { return timestamp }
 
-	state.AddVouch(VouchEvent{From: "alice", To: "bob"})
-	state.AddVouch(VouchEvent{From: "carol", To: "bob"})
+	state.AddVouch(VouchEvent{From: "alice", To: "bob", Timestamp: timestamp})
+	state.AddVouch(VouchEvent{From: "carol", To: "bob", Timestamp: timestamp})
 
-	state.SetProof(ProofEvent{User: "alice", Balance: 100})
-	state.SetProof(ProofEvent{User: "carol", Balance: 50})
-	state.SetProof(ProofEvent{User: "bob", Balance: 10})
+	state.SetProof(ProofEvent{User: "alice", Balance: 100, Timestamp: timestamp})
+	state.SetProof(ProofEvent{User: "carol", Balance: 50, Timestamp: timestamp})
+	state.SetProof(ProofEvent{User: "bob", Balance: 10, Timestamp: timestamp})
 
 	got := Balance(state, "bob", nil)
 	if got != 25 {
@@ -156,16 +177,18 @@ func TestBalanceBuildsIncomingTree(t *testing.T) {
 
 func TestBalanceUsesProvidedTree(t *testing.T) {
 	state := NewAppState()
+	timestamp := time.Date(2024, time.January, 2, 3, 4, 5, 0, time.UTC)
+	state.now = func() time.Time { return timestamp }
 
-	v1 := VouchEvent{From: "dan", To: "carol"}
-	v2 := VouchEvent{From: "carol", To: "bob"}
+	v1 := VouchEvent{From: "dan", To: "carol", Timestamp: timestamp}
+	v2 := VouchEvent{From: "carol", To: "bob", Timestamp: timestamp}
 
 	state.AddVouch(v1)
 	state.AddVouch(v2)
 
-	state.SetProof(ProofEvent{User: "dan", Balance: 1000})
-	state.SetProof(ProofEvent{User: "carol", Balance: 100})
-	state.SetProof(ProofEvent{User: "bob", Balance: 10})
+	state.SetProof(ProofEvent{User: "dan", Balance: 1000, Timestamp: timestamp})
+	state.SetProof(ProofEvent{User: "carol", Balance: 100, Timestamp: timestamp})
+	state.SetProof(ProofEvent{User: "bob", Balance: 10, Timestamp: timestamp})
 
 	tree := IncomingTree(state, "bob", 1)
 
@@ -183,12 +206,15 @@ func TestBalanceUsesProvidedTree(t *testing.T) {
 
 func TestBalanceAppliesPenaltyAggregation(t *testing.T) {
 	state := NewAppState()
-	state.AddVouch(VouchEvent{From: "carol", To: "bob"})
+	timestamp := time.Date(2024, time.January, 2, 3, 4, 5, 0, time.UTC)
+	state.now = func() time.Time { return timestamp }
 
-	state.SetProof(ProofEvent{User: "bob", Balance: 100})
-	state.SetProof(ProofEvent{User: "carol", Balance: 100})
+	state.AddVouch(VouchEvent{From: "carol", To: "bob", Timestamp: timestamp})
 
-	state.AddPenalty(PenaltyEvent{User: "bob", Amount: 50})
+	state.SetProof(ProofEvent{User: "bob", Balance: 100, Timestamp: timestamp})
+	state.SetProof(ProofEvent{User: "carol", Balance: 100, Timestamp: timestamp})
+
+	state.AddPenalty(PenaltyEvent{User: "bob", Amount: 50, Timestamp: timestamp})
 
 	got := Balance(state, "bob", nil)
 	if got != 59 {
@@ -198,13 +224,14 @@ func TestBalanceAppliesPenaltyAggregation(t *testing.T) {
 
 func TestBalanceAppliesTransientPenaltyFromOutgoingPeers(t *testing.T) {
 	state := NewAppState()
+	timestamp := time.Date(2024, time.January, 2, 3, 4, 5, 0, time.UTC)
+	state.now = func() time.Time { return timestamp }
 
-	state.AddVouch(VouchEvent{From: "alice", To: "bob"})
-	state.AddVouch(VouchEvent{From: "alice", To: "mallory"})
+	state.AddVouch(VouchEvent{From: "alice", To: "bob", Timestamp: timestamp})
+	state.AddVouch(VouchEvent{From: "alice", To: "mallory", Timestamp: timestamp})
 
-	state.SetProof(ProofEvent{User: "alice", Balance: 100})
-	state.AddPenalty(PenaltyEvent{User: "mallory", Amount: 100})
-
+	state.SetProof(ProofEvent{User: "alice", Balance: 100, Timestamp: timestamp})
+	state.AddPenalty(PenaltyEvent{User: "mallory", Amount: 100, Timestamp: timestamp})
 	got := Balance(state, "bob", nil)
 	// alice's balance = 100 - 10% of mallory's 100 penalty = 90
 	// bob's balance = 10% of alice's balance = 9
@@ -215,6 +242,8 @@ func TestBalanceAppliesTransientPenaltyFromOutgoingPeers(t *testing.T) {
 
 func TestBalanceUsesTopVoucherBalances(t *testing.T) {
 	state := NewAppState()
+	timestamp := time.Date(2024, time.January, 2, 3, 4, 5, 0, time.UTC)
+	state.now = func() time.Time { return timestamp }
 
 	vouchers := []struct {
 		user    string
@@ -229,8 +258,8 @@ func TestBalanceUsesTopVoucherBalances(t *testing.T) {
 	}
 
 	for _, v := range vouchers {
-		state.AddVouch(VouchEvent{From: v.user, To: "bob"})
-		state.SetProof(ProofEvent{User: v.user, Balance: v.balance})
+		state.AddVouch(VouchEvent{From: v.user, To: "bob", Timestamp: timestamp})
+		state.SetProof(ProofEvent{User: v.user, Balance: v.balance, Timestamp: timestamp})
 	}
 
 	got := Balance(state, "bob", nil)
@@ -242,11 +271,12 @@ func TestBalanceUsesTopVoucherBalances(t *testing.T) {
 
 func TestBalanceIgnoresNegativeVoucherBalance(t *testing.T) {
 	state := NewAppState()
+	timestamp := time.Date(2024, time.January, 2, 3, 4, 5, 0, time.UTC)
+	state.now = func() time.Time { return timestamp }
 
-	state.AddVouch(VouchEvent{From: "mallory", To: "bob"})
-	state.SetProof(ProofEvent{User: "mallory", Balance: 10})
-	state.AddPenalty(PenaltyEvent{User: "mallory", Amount: 50})
-
+	state.AddVouch(VouchEvent{From: "mallory", To: "bob", Timestamp: timestamp})
+	state.SetProof(ProofEvent{User: "mallory", Balance: 10, Timestamp: timestamp})
+	state.AddPenalty(PenaltyEvent{User: "mallory", Amount: 50, Timestamp: timestamp})
 	got := Balance(state, "bob", nil)
 	if got != 0 {
 		t.Fatalf("expected balance 0, got %d", got)

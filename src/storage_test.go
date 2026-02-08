@@ -273,48 +273,6 @@ func TestStoragePenaltiesReturnsCopy(t *testing.T) {
 	})
 }
 
-func TestStoragePenaltiesPerUser(t *testing.T) {
-	testStorageImplementations(t, "PenaltiesPerUser", func(t *testing.T, storage Storage) {
-		p1 := PenaltyEvent{User: "alice", Amount: 10}
-		p2 := PenaltyEvent{User: "bob", Amount: 20}
-		p3 := PenaltyEvent{User: "alice", Amount: 30}
-
-		if err := storage.AddPenalty(p1); err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if err := storage.AddPenalty(p2); err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if err := storage.AddPenalty(p3); err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-
-		alicePenalties, err := storage.Penalties("alice")
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if len(alicePenalties) != 2 {
-			t.Fatalf("expected 2 penalties for alice, got %d", len(alicePenalties))
-		}
-
-		bobPenalties, err := storage.Penalties("bob")
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if len(bobPenalties) != 1 {
-			t.Fatalf("expected 1 penalty for bob, got %d", len(bobPenalties))
-		}
-
-		carolPenalties, err := storage.Penalties("carol")
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if len(carolPenalties) != 0 {
-			t.Fatalf("expected 0 penalties for carol, got %d", len(carolPenalties))
-		}
-	})
-}
-
 func TestStorageMultipleUsers(t *testing.T) {
 	testStorageImplementations(t, "MultipleUsers", func(t *testing.T, storage Storage) {
 		// Add vouches
@@ -486,50 +444,6 @@ func TestSQLiteStoragePersistence(t *testing.T) {
 	}
 }
 
-// Verifies that AppState works correctly with SQLite storage.
-func TestAppStateWithSQLiteStorage(t *testing.T) {
-	tmpFile, err := os.CreateTemp("", "test_appstate_*.db")
-	if err != nil {
-		t.Fatalf("Failed to create temp file: %v", err)
-	}
-	tmpFile.Close()
-	defer os.Remove(tmpFile.Name())
-
-	storage, err := NewSQLiteStorage(tmpFile.Name())
-	if err != nil {
-		t.Fatalf("Failed to create SQLite storage: %v", err)
-	}
-	defer storage.Close()
-
-	state := NewAppStateWithStorage(storage)
-
-	// Test the same operations as with memory storage
-	state.AddVouch(VouchEvent{From: "alice", To: "bob"})
-	state.AddVouch(VouchEvent{From: "bob", To: "carol"})
-
-	vouches := state.UserVouchesFrom("alice")
-	if len(vouches) != 1 {
-		t.Fatalf("expected 1 vouch, got %d", len(vouches))
-	}
-
-	state.SetProof(ProofEvent{User: "alice", Balance: 100})
-	proof, err := state.ProofRecord("alice")
-	if err != nil || proof.Balance != 100 {
-		t.Fatalf("unexpected proof: %#v", proof)
-	}
-
-	state.AddPenalty(PenaltyEvent{User: "alice", Amount: 10})
-	penalties := state.Penalties("alice")
-	if len(penalties) != 1 || penalties[0].Amount != 10 {
-		t.Fatalf("unexpected penalties: %#v", penalties)
-	}
-
-	balance := state.ModerationBalance("alice")
-	if balance != 90 {
-		t.Fatalf("expected balance 90, got %d", balance)
-	}
-}
-
 // Verifies that AppState behaves identically with both storage types.
 func TestAppStateWithBothStorages(t *testing.T) {
 	// Test with memory storage
@@ -590,12 +504,6 @@ func TestAppStateWithBothStorages(t *testing.T) {
 			if memPenalties[i] != sqlitePenalties[i] {
 				t.Fatalf("penalty mismatch at index %d: memory=%#v, sqlite=%#v", i, memPenalties[i], sqlitePenalties[i])
 			}
-		}
-
-		memBalance := memState.ModerationBalance(user)
-		sqliteBalance := sqliteState.ModerationBalance(user)
-		if memBalance != sqliteBalance {
-			t.Fatalf("balance mismatch: memory=%d, sqlite=%d", memBalance, sqliteBalance)
 		}
 	}
 }

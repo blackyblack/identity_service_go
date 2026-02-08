@@ -102,25 +102,6 @@ func (s *AppState) Penalties(user string) []PenaltyEvent {
 	return penalties
 }
 
-// Computes a user's balance as the proof balance minus penalties.
-// If no proof record exists, the base balance is 0.
-// Both proof balance and penalty amounts are subject to time-based decay.
-func (s *AppState) ModerationBalance(user string) int64 {
-	now := s.currentTime()
-	proof, err := s.ProofRecord(user)
-	if err != nil {
-		log.Printf("Error getting proof record for user %s: %v", user, err)
-		return 0
-	}
-	base := int64(DecayedAmount(proof.Balance, proof.Timestamp, now))
-	penaltySum := int64(0)
-	for _, penalty := range s.Penalties(user) {
-		penaltySum += int64(DecayedAmount(penalty.Amount, penalty.Timestamp, now))
-	}
-
-	return base - penaltySum
-}
-
 // Releases any resources used by the storage.
 func (s *AppState) Close() error {
 	return s.storage.Close()

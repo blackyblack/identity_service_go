@@ -10,12 +10,14 @@ const penaltyWeightPerLayer = 0.1
 const balanceWeightPerLayer = 0.1
 const maxBalanceVouchers = 5
 
+// This number is divided by IDT decimals, so it's 0.000001 IDT per day if IDT has 6 decimals.
+const idtDecayPerDay = 1
+
 // DecayedAmount computes the value after applying time-based decay.
-// The amount decreases by 1 per day elapsed since the timestamp.
+// The amount decreases by idtDecayPerDay per day elapsed since the timestamp.
 // Returns 0 if the decayed value would go negative.
-// If timestamp is zero, no decay is applied.
 func DecayedAmount(amount uint64, timestamp time.Time, now time.Time) uint64 {
-	if timestamp.IsZero() {
+	if now.Before(timestamp) {
 		return amount
 	}
 	elapsed := now.Sub(timestamp)
@@ -23,10 +25,11 @@ func DecayedAmount(amount uint64, timestamp time.Time, now time.Time) uint64 {
 		return amount
 	}
 	days := uint64(elapsed / (24 * time.Hour))
-	if days >= amount {
+	decay := days * idtDecayPerDay
+	if decay >= amount {
 		return 0
 	}
-	return amount - days
+	return amount - decay
 }
 
 // An Heap is a min-heap struct.

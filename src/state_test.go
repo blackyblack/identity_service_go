@@ -87,33 +87,3 @@ func TestAppStateSetProofReplacesExisting(t *testing.T) {
 		t.Fatalf("expected latest balance 25, got %d", proof.Balance)
 	}
 }
-
-func TestAppStateModerationBalanceSubtractsPenalties(t *testing.T) {
-	state := NewAppState()
-
-	state.SetProof(ProofEvent{User: "alice", Balance: 100})
-	state.AddPenalty(PenaltyEvent{User: "alice", Amount: 10})
-	state.AddPenalty(PenaltyEvent{User: "alice", Amount: 15})
-	state.AddPenalty(PenaltyEvent{User: "bob", Amount: 50})
-
-	if got := state.ModerationBalance("alice"); got != 75 {
-		t.Fatalf("expected moderated balance 75, got %d", got)
-	}
-}
-
-func TestAppStateModerationBalanceNoProofRecord(t *testing.T) {
-	state := NewAppState()
-
-	// User with no proof record should have base balance of 0
-	if got := state.ModerationBalance("alice"); got != 0 {
-		t.Fatalf("expected moderated balance 0, got %d", got)
-	}
-
-	// User with no proof record but with penalties should have negative balance
-	state.AddPenalty(PenaltyEvent{User: "bob", Amount: 10})
-	state.AddPenalty(PenaltyEvent{User: "bob", Amount: 20})
-
-	if got := state.ModerationBalance("bob"); got != -30 {
-		t.Fatalf("expected moderated balance -30, got %d", got)
-	}
-}
