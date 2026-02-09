@@ -20,7 +20,7 @@ func TestPenaltyBuildsOutgoingTree(t *testing.T) {
 	state.AddPenalty(PenaltyEvent{User: "bob", Amount: 100, Timestamp: timestamp})
 	state.AddPenalty(PenaltyEvent{User: "carol", Amount: 1000, Timestamp: timestamp})
 
-	got := Penalty(state, "alice", nil)
+	got := Penalty(state, "alice", nil, nil)
 	if got != 25 {
 		t.Fatalf("expected penalty 25, got %d", got)
 	}
@@ -43,13 +43,13 @@ func TestPenaltyUsesProvidedTree(t *testing.T) {
 
 	tree := OutgoingTree(state, "alice", 1)
 
-	got := Penalty(state, "alice", tree)
+	got := Penalty(state, "alice", tree, nil)
 	if got != 15 {
 		t.Fatalf("expected penalty 15, got %d", got)
 	}
 
 	// Without provided tree, full depth is used
-	got = Penalty(state, "alice", nil)
+	got = Penalty(state, "alice", nil, nil)
 	if got != 25 {
 		t.Fatalf("expected penalty 25, got %d", got)
 	}
@@ -61,11 +61,39 @@ func TestPenaltySumsUserPenalties(t *testing.T) {
 	state.now = func() time.Time { return timestamp }
 
 	state.AddPenalty(PenaltyEvent{User: "alice", Amount: 10, Timestamp: timestamp})
-	state.AddPenalty(PenaltyEvent{User: "alice", Amount: 7, Timestamp: timestamp.Add(1 * time.Hour)})
+	state.AddPenalty(PenaltyEvent{User: "alice", Amount: 7, Timestamp: timestamp.Add(-1 * time.Hour)})
 
-	got := Penalty(state, "alice", nil)
+	got := Penalty(state, "alice", nil, nil)
 	if got != 17 {
 		t.Fatalf("expected penalty 17, got %d", got)
+	}
+}
+
+func TestPenaltyUsesProvidedTimestamp(t *testing.T) {
+	now := time.Date(2025, 6, 20, 0, 0, 0, 0, time.UTC)
+	snapshot := time.Date(2025, 6, 12, 0, 0, 0, 0, time.UTC)
+	state := NewAppState()
+	state.now = func() time.Time { return now }
+
+	state.AddPenalty(PenaltyEvent{
+		User:      "alice",
+		Amount:    100,
+		Timestamp: time.Date(2025, 6, 10, 0, 0, 0, 0, time.UTC),
+	})
+	state.AddPenalty(PenaltyEvent{
+		User:      "alice",
+		Amount:    50,
+		Timestamp: time.Date(2025, 6, 15, 0, 0, 0, 0, time.UTC),
+	})
+
+	gotDefault := Penalty(state, "alice", nil, nil)
+	if gotDefault != 135 {
+		t.Fatalf("expected default-time penalty 135, got %d", gotDefault)
+	}
+
+	gotSnapshot := Penalty(state, "alice", nil, &snapshot)
+	if gotSnapshot != 98 {
+		t.Fatalf("expected snapshot penalty 98, got %d", gotSnapshot)
 	}
 }
 
@@ -83,7 +111,7 @@ func TestPenaltyUserNotInGraphUsesDirectPenalties(t *testing.T) {
 		t.Fatalf("expected no outgoing peers for mallory, got %d", got)
 	}
 
-	got := Penalty(state, "mallory", nil)
+	got := Penalty(state, "mallory", nil, nil)
 	if got != 12 {
 		t.Fatalf("expected penalty 12, got %d", got)
 	}
@@ -92,7 +120,7 @@ func TestPenaltyUserNotInGraphUsesDirectPenalties(t *testing.T) {
 func TestPenaltyEmptyStateNoPenalties(t *testing.T) {
 	state := NewAppState()
 
-	got := Penalty(state, "alice", nil)
+	got := Penalty(state, "alice", nil, nil)
 	if got != 0 {
 		t.Fatalf("expected penalty 0, got %d", got)
 	}
@@ -107,7 +135,7 @@ func TestPenaltyInheritsFromVouchedUsers(t *testing.T) {
 	state.AddVouch(VouchEvent{From: "alice", To: "carol", Timestamp: timestamp})
 	state.AddPenalty(PenaltyEvent{User: "bob", Amount: 50, Timestamp: timestamp})
 	state.AddPenalty(PenaltyEvent{User: "carol", Amount: 70, Timestamp: timestamp})
-	got := Penalty(state, "alice", nil)
+	got := Penalty(state, "alice", nil, nil)
 	if got != 12 {
 		t.Fatalf("expected penalty 12, got %d", got)
 	}
@@ -116,7 +144,7 @@ func TestPenaltyInheritsFromVouchedUsers(t *testing.T) {
 func TestBalanceEmptyStateNoProof(t *testing.T) {
 	state := NewAppState()
 
-	got := Balance(state, "alice", nil)
+	got := Balance(state, "alice", nil, nil)
 	if got != 0 {
 		t.Fatalf("expected balance 0, got %d", got)
 	}
@@ -136,7 +164,7 @@ func TestBalanceUserNotInGraphUsesDirectPenalties(t *testing.T) {
 		t.Fatalf("expected no incoming peers for mallory, got %d", got)
 	}
 
-	got := Balance(state, "mallory", nil)
+	got := Balance(state, "mallory", nil, nil)
 	if got != 28 {
 		t.Fatalf("expected balance 28, got %d", got)
 	}
@@ -151,7 +179,7 @@ func TestBalanceNegativeWhenPenaltiesExceedProof(t *testing.T) {
 	state.SetProof(ProofEvent{User: "bob", Balance: 10, Timestamp: timestamp})
 	state.AddPenalty(PenaltyEvent{User: "bob", Amount: 50, Timestamp: timestamp})
 
-	got := Balance(state, "bob", nil)
+	got := Balance(state, "bob", nil, nil)
 	if got != -40 {
 		t.Fatalf("expected balance -40, got %d", got)
 	}
@@ -169,7 +197,7 @@ func TestBalanceBuildsIncomingTree(t *testing.T) {
 	state.SetProof(ProofEvent{User: "carol", Balance: 50, Timestamp: timestamp})
 	state.SetProof(ProofEvent{User: "bob", Balance: 10, Timestamp: timestamp})
 
-	got := Balance(state, "bob", nil)
+	got := Balance(state, "bob", nil, nil)
 	if got != 25 {
 		t.Fatalf("expected balance 25, got %d", got)
 	}
@@ -192,15 +220,43 @@ func TestBalanceUsesProvidedTree(t *testing.T) {
 
 	tree := IncomingTree(state, "bob", 1)
 
-	got := Balance(state, "bob", tree)
+	got := Balance(state, "bob", tree, nil)
 	if got != 20 {
 		t.Fatalf("expected balance 20, got %d", got)
 	}
 
 	// Without provided tree, full depth is used
-	got = Balance(state, "bob", nil)
+	got = Balance(state, "bob", nil, nil)
 	if got != 30 {
 		t.Fatalf("expected balance 30, got %d", got)
+	}
+}
+
+func TestBalanceUsesProvidedTimestamp(t *testing.T) {
+	now := time.Date(2025, 6, 20, 0, 0, 0, 0, time.UTC)
+	snapshot := time.Date(2025, 6, 12, 0, 0, 0, 0, time.UTC)
+	state := NewAppState()
+	state.now = func() time.Time { return now }
+
+	state.SetProof(ProofEvent{
+		User:      "alice",
+		Balance:   100,
+		Timestamp: time.Date(2025, 6, 10, 0, 0, 0, 0, time.UTC),
+	})
+	state.AddPenalty(PenaltyEvent{
+		User:      "alice",
+		Amount:    30,
+		Timestamp: time.Date(2025, 6, 15, 0, 0, 0, 0, time.UTC),
+	})
+
+	gotDefault := Balance(state, "alice", nil, nil)
+	if gotDefault != 65 {
+		t.Fatalf("expected default-time balance 65, got %d", gotDefault)
+	}
+
+	gotSnapshot := Balance(state, "alice", nil, &snapshot)
+	if gotSnapshot != 98 {
+		t.Fatalf("expected snapshot balance 98, got %d", gotSnapshot)
 	}
 }
 
@@ -216,7 +272,7 @@ func TestBalanceAppliesPenaltyAggregation(t *testing.T) {
 
 	state.AddPenalty(PenaltyEvent{User: "bob", Amount: 50, Timestamp: timestamp})
 
-	got := Balance(state, "bob", nil)
+	got := Balance(state, "bob", nil, nil)
 	if got != 59 {
 		t.Fatalf("expected balance 59, got %d", got)
 	}
@@ -232,7 +288,7 @@ func TestBalanceAppliesTransientPenaltyFromOutgoingPeers(t *testing.T) {
 
 	state.SetProof(ProofEvent{User: "alice", Balance: 100, Timestamp: timestamp})
 	state.AddPenalty(PenaltyEvent{User: "mallory", Amount: 100, Timestamp: timestamp})
-	got := Balance(state, "bob", nil)
+	got := Balance(state, "bob", nil, nil)
 	// alice's balance = 100 - 10% of mallory's 100 penalty = 90
 	// bob's balance = 10% of alice's balance = 9
 	if got != 9 {
@@ -262,7 +318,7 @@ func TestBalanceUsesTopVoucherBalances(t *testing.T) {
 		state.SetProof(ProofEvent{User: v.user, Balance: v.balance, Timestamp: timestamp})
 	}
 
-	got := Balance(state, "bob", nil)
+	got := Balance(state, "bob", nil, nil)
 	// Top 5 voucher balances: 100 + 50 + 40 + 30 + 20 = 240; weighted by 10% = 24
 	if got != 24 {
 		t.Fatalf("expected balance 24, got %d", got)
@@ -277,7 +333,7 @@ func TestBalanceIgnoresNegativeVoucherBalance(t *testing.T) {
 	state.AddVouch(VouchEvent{From: "mallory", To: "bob", Timestamp: timestamp})
 	state.SetProof(ProofEvent{User: "mallory", Balance: 10, Timestamp: timestamp})
 	state.AddPenalty(PenaltyEvent{User: "mallory", Amount: 50, Timestamp: timestamp})
-	got := Balance(state, "bob", nil)
+	got := Balance(state, "bob", nil, nil)
 	if got != 0 {
 		t.Fatalf("expected balance 0, got %d", got)
 	}

@@ -35,8 +35,9 @@ func TestDecayedAmountFutureTimestamp(t *testing.T) {
 	now := time.Now().UTC()
 	future := now.Add(10 * 24 * time.Hour)
 	got := DecayedAmount(100, future, now)
-	if got != 100 {
-		t.Fatalf("expected 100, got %d", got)
+	// Future timestamp should return 0
+	if got != 0 {
+		t.Fatalf("expected 0, got %d", got)
 	}
 }
 
@@ -68,7 +69,7 @@ func TestPenaltyMultipleWithDecay(t *testing.T) {
 		Timestamp: now.Add(-5 * 24 * time.Hour),
 	})
 
-	got := Penalty(state, "alice", nil)
+	got := Penalty(state, "alice", nil, nil)
 	// 90 + 45 = 135
 	if got != 135 {
 		t.Fatalf("expected penalty 135, got %d", got)
@@ -93,7 +94,7 @@ func TestBalanceWithProofAndPenaltyDecay(t *testing.T) {
 		Timestamp: now.Add(-5 * 24 * time.Hour),
 	})
 
-	got := Balance(state, "alice", nil)
+	got := Balance(state, "alice", nil, nil)
 	// 90 - 25 = 65
 	if got != 65 {
 		t.Fatalf("expected balance 65, got %d", got)

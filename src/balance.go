@@ -16,9 +16,11 @@ const idtDecayPerDay = 1
 // DecayedAmount computes the value after applying time-based decay.
 // The amount decreases by idtDecayPerDay per day elapsed since the timestamp.
 // Returns 0 if the decayed value would go negative.
+// Returns 0 if the timestamp is in the future relative to now (allows to see a
+// snapshot of a tree for a given timestamp).
 func DecayedAmount(amount uint64, timestamp time.Time, now time.Time) uint64 {
 	if now.Before(timestamp) {
-		return amount
+		return 0
 	}
 	elapsed := now.Sub(timestamp)
 	if elapsed <= 0 {
@@ -55,7 +57,9 @@ func (h *Heap) Pop() any {
 
 // Computes the aggregated penalty for a user.
 // If an outgoing tree is not provided, it is built from the vouch graph.
-func Penalty(state *AppState, user string, tree *VouchTreeNode) uint64 {
+// Optional parameter `now allows to compute the penalty at a specific point
+// in time.
+func Penalty(state *AppState, user string, tree *VouchTreeNode, now *time.Time) uint64 {
 	// user should be the root of the tree
 	if tree != nil && tree.User != user {
 		log.Fatalf("Warning: provided tree root user %v does not match target user %v", tree.User, user)
@@ -68,7 +72,10 @@ func Penalty(state *AppState, user string, tree *VouchTreeNode) uint64 {
 
 	// NOTE: Do not check for nil state or tree, allow panic in that case.
 
-	now := state.currentTime()
+	if now == nil {
+		currentTime := state.currentTime()
+		now = &currentTime
+	}
 
 	penaltySums := make(map[string]uint64)
 	basePenalty := func(u string) uint64 {
@@ -78,7 +85,7 @@ func Penalty(state *AppState, user string, tree *VouchTreeNode) uint64 {
 		sum := uint64(0)
 		userPenalties := state.Penalties(u)
 		for _, p := range userPenalties {
-			sum += DecayedAmount(p.Amount, p.Timestamp, now)
+			sum += DecayedAmount(p.Amount, p.Timestamp, *now)
 		}
 		penaltySums[u] = sum
 		return sum
@@ -100,7 +107,9 @@ func Penalty(state *AppState, user string, tree *VouchTreeNode) uint64 {
 
 // Computes the aggregated balance for a user.
 // If incoming tree is not provided, it is built from the vouch graph.
-func Balance(state *AppState, user string, incomingTree *VouchTreeNode) int64 {
+// Optional parameter `now` allows to compute the balance at a specific point
+// in time.
+func Balance(state *AppState, user string, incomingTree *VouchTreeNode, now *time.Time) int64 {
 	// user should be the root of the tree
 	if incomingTree != nil && incomingTree.User != user {
 		log.Fatalf("Warning: provided tree root user %v does not match target user %v", incomingTree.User, user)
@@ -113,7 +122,10 @@ func Balance(state *AppState, user string, incomingTree *VouchTreeNode) int64 {
 
 	// NOTE: Do not check for nil state or tree, allow panic in that case.
 
-	now := state.currentTime()
+	if now == nil {
+		currentTime := state.currentTime()
+		now = &currentTime
+	}
 
 	balances := make(map[string]int64)
 	baseBalance := func(u string) int64 {
@@ -125,12 +137,12 @@ func Balance(state *AppState, user string, incomingTree *VouchTreeNode) int64 {
 		if err != nil {
 			log.Printf("Error getting proof record for user %s: %v", u, err)
 		} else {
-			sum = int64(DecayedAmount(proof.Balance, proof.Timestamp, now))
+			sum = int64(DecayedAmount(proof.Balance, proof.Timestamp, *now))
 		}
 
 		// TODO: rebuilds the outgoing tree for u each time; could be optimized by caching
 		outgoingTree := OutgoingTree(state, u, DefaultTreeDepth)
-		sum -= int64(Penalty(state, u, outgoingTree))
+		sum -= int64(Penalty(state, u, outgoingTree, now))
 		balances[u] = sum
 		return sum
 	}
