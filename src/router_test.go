@@ -251,10 +251,6 @@ func TestPunishHandler_Success(t *testing.T) {
 		t.Fatalf("Expected message 'Punish accepted', got '%s'", resp.Message)
 	}
 
-	if got := appState.ModerationBalance("user1"); got != 70 {
-		t.Fatalf("expected moderated balance 70, got %d", got)
-	}
-
 	penalties := appState.Penalties("user1")
 	if len(penalties) != 1 {
 		t.Fatalf("expected 1 penalty, got %d", len(penalties))

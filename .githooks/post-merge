@@ -1,8 +1,0 @@
-#!/usr/bin/env bash
-set -euo pipefail
-
-if [[ -x "./scripts/session_pull.sh" ]]; then
-  ./scripts/session_pull.sh
-else
-  echo "./scripts/session_pull.sh not found or not executable; skipping session memory pull" >&2
-fi
